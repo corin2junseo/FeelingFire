@@ -30,5 +30,5 @@ export async function GET(request: NextRequest) {
   }
 
   // 로그인 완료 후 대시보드로 이동
-  return NextResponse.redirect(`${origin}/dashboard`)
+  return NextResponse.redirect(`${origin}/workspace`)
 }
