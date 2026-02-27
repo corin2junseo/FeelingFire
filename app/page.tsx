@@ -15,7 +15,7 @@ export default function Home() {
                 logoText="Feeling Fire"
                 navLinks={navLinks}
                 mainText="AI-powered music generation for YouTube creators. Create unique, royalty-free tracks tailored to your video's mood in seconds."
-                ctaLink="#features"
+                ctaLink="/auth"
                 imageSrc="https://ik.imagekit.io/fpxbgsota/image%2013.png?updatedAt=1753531863793"
                 imageAlt="AI music generation visual"
                 overlayText={{
