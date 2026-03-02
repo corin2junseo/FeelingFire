@@ -2,12 +2,19 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, LogOut } from "lucide-react";
+import { Search, LogOut, Star } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { CreditModal } from "@/components/CreditModal";
 
-export function WorkspaceNavbar() {
+interface WorkspaceNavbarProps {
+    searchQuery?: string;
+    onSearchChange?: (query: string) => void;
+}
+
+export function WorkspaceNavbar({ searchQuery = "", onSearchChange }: WorkspaceNavbarProps) {
     const { user, signOut } = useAuth();
     const [popoverOpen, setPopoverOpen] = useState(false);
+    const [creditModalOpen, setCreditModalOpen] = useState(false);
 
     const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
     const fullName =
@@ -20,6 +27,7 @@ export function WorkspaceNavbar() {
         .toUpperCase();
 
     return (
+        <>
         <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4">
             {/* ── Logo ── */}
             <motion.span
@@ -51,6 +59,8 @@ export function WorkspaceNavbar() {
                     <input
                         type="text"
                         placeholder="Search..."
+                        value={searchQuery}
+                        onChange={(e) => onSearchChange?.(e.target.value)}
                         className="w-full bg-transparent text-[0.83rem] text-white placeholder:text-white/25 focus:outline-none"
                     />
                     {/* Inner top-edge highlight */}
@@ -126,6 +136,20 @@ export function WorkspaceNavbar() {
                                 </div>
                             </div>
 
+                            {/* Upgrade */}
+                            <button
+                                onClick={() => {
+                                    setPopoverOpen(false);
+                                    setCreditModalOpen(true);
+                                }}
+                                className="flex w-full items-center gap-2.5 px-4 py-3 text-[0.8rem] text-amber-400/80
+                                    transition-colors duration-150
+                                    hover:bg-white/[0.04] hover:text-amber-300"
+                            >
+                                <Star className="h-3.5 w-3.5" />
+                                <span>Upgrade</span>
+                            </button>
+
                             {/* Sign out */}
                             <button
                                 onClick={signOut}
@@ -141,5 +165,8 @@ export function WorkspaceNavbar() {
                 </AnimatePresence>
             </motion.div>
         </nav>
+
+        <CreditModal open={creditModalOpen} onClose={() => setCreditModalOpen(false)} />
+        </>
     );
 }

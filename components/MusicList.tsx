@@ -9,9 +9,10 @@ interface MusicListProps {
   isLoading: boolean;
   onRename?: (id: string, newTitle: string) => void;
   onDelete?: (id: string) => void;
+  searchQuery?: string;
 }
 
-export function MusicList({ musics, isLoading, onRename, onDelete }: MusicListProps) {
+export function MusicList({ musics, isLoading, onRename, onDelete, searchQuery }: MusicListProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 mt-32">
@@ -22,15 +23,20 @@ export function MusicList({ musics, isLoading, onRename, onDelete }: MusicListPr
   }
 
   if (musics.length === 0) {
+    const isSearching = !!searchQuery?.trim();
     return (
       <div className="flex flex-col items-center justify-center gap-4 mt-32 text-center">
         <div className="w-14 h-14 rounded-2xl bg-[#1F2023] border border-[#333] flex items-center justify-center">
           <Music2 className="w-6 h-6 text-gray-600" />
         </div>
         <div>
-          <p className="text-gray-400 text-sm font-medium">No music yet</p>
+          <p className="text-gray-400 text-sm font-medium">
+            {isSearching ? `No results for "${searchQuery}"` : "No music yet"}
+          </p>
           <p className="text-gray-600 text-xs mt-1">
-            Describe the music you want and hit send
+            {isSearching
+              ? "Try a different title or keyword"
+              : "Describe the music you want and hit send"}
           </p>
         </div>
       </div>

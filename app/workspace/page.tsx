@@ -31,6 +31,7 @@ export default function WorkspacePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState(false);
   const [pollingItems, setPollingItems] = useState<PollingItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const pollingItemsRef = useRef<PollingItem[]>([]);
 
   useEffect(() => {
@@ -269,7 +270,7 @@ export default function WorkspacePage() {
 
   return (
     <div className="min-h-screen bg-[#171717]">
-      <WorkspaceNavbar />
+      <WorkspaceNavbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
       <main className="pt-20 pb-64 px-4 flex flex-col items-center">
         <GenerationStatus
@@ -277,10 +278,19 @@ export default function WorkspacePage() {
           hasError={generationError}
         />
         <MusicList
-          musics={musics}
+          musics={
+            searchQuery.trim()
+              ? musics.filter((m) =>
+                  (m.title ?? m.prompt)
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase())
+                )
+              : musics
+          }
           isLoading={isLoadingHistory}
           onRename={handleRename}
           onDelete={handleDelete}
+          searchQuery={searchQuery}
         />
       </main>
 

@@ -166,3 +166,8 @@ npm run dev
 - 버킷: `musics` (비공개)
 - 경로 패턴: `{user_id}/{filename}.mp3`
 - RLS: 사용자는 자신의 폴더(`foldername[1] = auth.uid()`)에만 접근 가능
+
+결제 관련
+1. 체크아웃
+
+2.웹훅
