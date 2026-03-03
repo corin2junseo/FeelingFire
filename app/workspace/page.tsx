@@ -9,6 +9,7 @@ import { PromptInputBox, type MusicOptions } from "@/components/PromptInputBox";
 import { MusicList } from "@/components/MusicList";
 import { MusicPlayer } from "@/components/MusicPlayer";
 import { GenerationStatus } from "@/components/GenerationStatus";
+import { CreditModal } from "@/components/CreditModal";
 import { createClient } from "@/lib/supabase/client";
 import type { Music } from "@/lib/types/musics";
 
@@ -22,8 +23,8 @@ interface PollingItem {
 }
 
 export default function WorkspacePage() {
-  const { user, loading } = useAuth();
-  const { currentTrack, setPlaylist } = useMusicPlayer();
+  const { user, loading, credits, refreshCredits } = useAuth();
+  const { setPlaylist } = useMusicPlayer();
   const router = useRouter();
 
   const [musics, setMusics] = useState<Music[]>([]);
@@ -32,6 +33,7 @@ export default function WorkspacePage() {
   const [generationError, setGenerationError] = useState(false);
   const [pollingItems, setPollingItems] = useState<PollingItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
   const pollingItemsRef = useRef<PollingItem[]>([]);
 
   useEffect(() => {
@@ -180,18 +182,24 @@ export default function WorkspacePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setGenerationError(true);
-        setMusics((prev) =>
-          prev.map((m) =>
-            tempIds.includes(m.id)
-              ? {
-                  ...m,
-                  status: "failed",
-                  error_message: data.error ?? "Generation failed",
-                }
-              : m
-          )
-        );
+        if (res.status === 402) {
+          // Remove optimistic placeholders and open credit modal
+          setMusics((prev) => prev.filter((m) => !tempIds.includes(m.id)));
+          setCreditModalOpen(true);
+        } else {
+          setGenerationError(true);
+          setMusics((prev) =>
+            prev.map((m) =>
+              tempIds.includes(m.id)
+                ? {
+                    ...m,
+                    status: "failed",
+                    error_message: data.error ?? "Generation failed",
+                  }
+                : m
+            )
+          );
+        }
       } else {
         const { predictionId, items } = data as {
           predictionId: string;
@@ -234,6 +242,7 @@ export default function WorkspacePage() {
       );
     } finally {
       setIsGenerating(false);
+      await refreshCredits();
     }
   };
 
@@ -266,13 +275,11 @@ export default function WorkspacePage() {
 
   if (!user) return null;
 
-  const promptBottom = currentTrack ? "bottom-[72px]" : "bottom-0";
-
   return (
     <div className="min-h-screen bg-[#171717]">
       <WorkspaceNavbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-      <main className="pt-20 pb-64 px-4 flex flex-col items-center">
+      <main className="pt-28 pb-64 px-4 flex flex-col items-center md:pt-20">
         <GenerationStatus
           isGenerating={isGenerating || pollingItems.length > 0}
           hasError={generationError}
@@ -294,21 +301,33 @@ export default function WorkspacePage() {
         />
       </main>
 
-      {/* Fixed bottom prompt */}
-      <div
-        className={`fixed ${promptBottom} left-0 right-0 z-40 flex justify-center px-4 pb-6 transition-all duration-300`}
-      >
-        <div className="w-full max-w-3xl">
-          <PromptInputBox
-            onSend={handleSend}
-            isLoading={isGenerating}
-            placeholder="Describe the music style, mood, genre…"
-          />
+      {/* Fixed bottom bar: PromptInput + MusicPlayer stacked */}
+      <div className="fixed bottom-0 left-0 right-0 z-40">
+        {/* Prompt input */}
+        <div
+          className="flex justify-center px-4 pb-4 pt-5"
+          style={{
+            background:
+              "linear-gradient(to top, #171717 70%, transparent)",
+          }}
+        >
+          <div className="w-full max-w-3xl">
+            <PromptInputBox
+              onSend={handleSend}
+              isLoading={isGenerating}
+              placeholder="Describe the music style, mood, genre…"
+              userCredits={credits}
+              onInsufficientCredits={() => setCreditModalOpen(true)}
+            />
+          </div>
         </div>
+
+        {/* Music player — slides in right below prompt when a track is active */}
+        <MusicPlayer />
       </div>
 
-      {/* Global music player */}
-      <MusicPlayer />
+      {/* Credit modal — opens on insufficient credits */}
+      <CreditModal open={creditModalOpen} onClose={() => setCreditModalOpen(false)} />
     </div>
   );
 }

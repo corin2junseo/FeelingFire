@@ -48,46 +48,51 @@ export function MusicPlayer() {
     a.click();
   };
 
-  const trackTitle =
-    currentTrack
-      ? currentTrack.prompt.length > 45
-        ? currentTrack.prompt.slice(0, 45) + "…"
-        : currentTrack.prompt
-      : "";
+  const trackTitle = currentTrack
+    ? currentTrack.prompt.length > 45
+      ? currentTrack.prompt.slice(0, 45) + "…"
+      : currentTrack.prompt
+    : "";
+
+  const mobileTitle = currentTrack
+    ? currentTrack.prompt.length > 25
+      ? currentTrack.prompt.slice(0, 25) + "…"
+      : currentTrack.prompt
+    : "";
 
   return (
     <AnimatePresence>
       {currentTrack && (
         <motion.div
-          initial={{ y: 90 }}
-          animate={{ y: 0 }}
-          exit={{ y: 90 }}
-          transition={{ type: "spring", damping: 22, stiffness: 220 }}
-          className="fixed bottom-0 left-0 right-0 z-50 h-[72px] bg-[#121212] border-t border-white/10 flex items-center px-4 gap-4"
+          initial={{ height: 0 }}
+          animate={{ height: 72 }}
+          exit={{ height: 0 }}
+          transition={{ type: "spring", damping: 26, stiffness: 300 }}
+          className="w-full overflow-hidden bg-[#121212] border-t border-white/10"
         >
-          {/* Left — track info */}
-          <div className="flex items-center gap-3 w-[28%] min-w-0">
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#2A2A2E] flex items-center justify-center">
-              <Music2 className="w-5 h-5 text-[#9b87f5]" />
+          {/* ── MOBILE layout (< md) ── */}
+          <div className="relative flex md:hidden h-[72px] items-center px-4 gap-3">
+            {/* Track info */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="flex-shrink-0 w-8 h-8 rounded-md bg-[#2A2A2E] flex items-center justify-center">
+                <Music2 className="w-4 h-4 text-[#9b87f5]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-white font-medium truncate leading-tight">
+                  {mobileTitle}
+                </p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Feelingfire</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm text-white font-medium truncate leading-tight">
-                {trackTitle}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">Feelingfire</p>
-            </div>
-          </div>
 
-          {/* Center — controls + progress */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
-            {/* Transport buttons */}
-            <div className="flex items-center gap-5">
+            {/* Compact controls */}
+            <div className="flex items-center gap-3 flex-shrink-0">
               <button
                 onClick={prev}
                 className="text-gray-400 hover:text-white transition-colors"
                 aria-label="Previous"
               >
-                <SkipBack className="w-[18px] h-[18px]" />
+                <SkipBack className="w-4 h-4" />
               </button>
 
               <button
@@ -107,64 +112,132 @@ export function MusicPlayer() {
                 className="text-gray-400 hover:text-white transition-colors"
                 aria-label="Next"
               >
-                <SkipForward className="w-[18px] h-[18px]" />
+                <SkipForward className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleDownload}
+                className="text-gray-500 hover:text-white transition-colors"
+                aria-label="Download"
+              >
+                <Download className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Progress bar */}
-            <div className="w-full flex items-center gap-2 max-w-md">
-              <span className="text-[10px] text-gray-500 w-7 text-right tabular-nums">
-                {formatTime(currentTime)}
-              </span>
+            {/* Progress strip — bottom of mobile row */}
+            <div
+              className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#2a2a2a] cursor-pointer"
+              onClick={handleProgressClick}
+            >
               <div
-                className="flex-1 h-1 bg-[#333] rounded-full cursor-pointer group relative"
-                onClick={handleProgressClick}
-              >
-                <div
-                  className="h-full bg-[#9b87f5] rounded-full relative"
-                  style={{ width: `${progress}%` }}
-                >
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity -mr-1.5" />
-                </div>
-              </div>
-              <span className="text-[10px] text-gray-500 w-7 tabular-nums">
-                {formatTime(duration)}
-              </span>
+                className="h-full bg-[#9b87f5]"
+                style={{ width: `${progress}%` }}
+              />
             </div>
           </div>
 
-          {/* Right — volume + download */}
-          <div className="flex items-center gap-3 w-[28%] justify-end">
-            <button
-              onClick={handleDownload}
-              className="text-gray-500 hover:text-white transition-colors"
-              aria-label="Download"
-            >
-              <Download className="w-4 h-4" />
-            </button>
+          {/* ── DESKTOP layout (≥ md) ── */}
+          <div className="hidden md:flex h-[72px] items-center px-4 gap-4">
+            {/* Left — track info */}
+            <div className="flex items-center gap-3 w-[28%] min-w-0">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#2A2A2E] flex items-center justify-center">
+                <Music2 className="w-5 h-5 text-[#9b87f5]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm text-white font-medium truncate leading-tight">
+                  {trackTitle}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">Feelingfire</p>
+              </div>
+            </div>
 
-            <div className="flex items-center gap-2">
+            {/* Center — controls + progress */}
+            <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
+              <div className="flex items-center gap-5">
+                <button
+                  onClick={prev}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="Previous"
+                >
+                  <SkipBack className="w-[18px] h-[18px]" />
+                </button>
+
+                <button
+                  onClick={togglePlay}
+                  className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-4 h-4 text-black fill-black" />
+                  ) : (
+                    <Play className="w-4 h-4 text-black fill-black ml-0.5" />
+                  )}
+                </button>
+
+                <button
+                  onClick={next}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="Next"
+                >
+                  <SkipForward className="w-[18px] h-[18px]" />
+                </button>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full flex items-center gap-2 max-w-md">
+                <span className="text-[10px] text-gray-500 w-7 text-right tabular-nums">
+                  {formatTime(currentTime)}
+                </span>
+                <div
+                  className="flex-1 h-1 bg-[#333] rounded-full cursor-pointer group relative"
+                  onClick={handleProgressClick}
+                >
+                  <div
+                    className="h-full bg-[#9b87f5] rounded-full relative"
+                    style={{ width: `${progress}%` }}
+                  >
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity -mr-1.5" />
+                  </div>
+                </div>
+                <span className="text-[10px] text-gray-500 w-7 tabular-nums">
+                  {formatTime(duration)}
+                </span>
+              </div>
+            </div>
+
+            {/* Right — volume + download */}
+            <div className="flex items-center gap-3 w-[28%] justify-end">
               <button
-                onClick={() => setVolume(volume === 0 ? 1 : 0)}
+                onClick={handleDownload}
                 className="text-gray-500 hover:text-white transition-colors"
-                aria-label="Toggle mute"
+                aria-label="Download"
               >
-                {volume === 0 ? (
-                  <VolumeX className="w-4 h-4" />
-                ) : (
-                  <Volume2 className="w-4 h-4" />
-                )}
+                <Download className="w-4 h-4" />
               </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.02"
-                value={volume}
-                onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-20 h-1 cursor-pointer accent-[#9b87f5]"
-                aria-label="Volume"
-              />
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setVolume(volume === 0 ? 1 : 0)}
+                  className="text-gray-500 hover:text-white transition-colors"
+                  aria-label="Toggle mute"
+                >
+                  {volume === 0 ? (
+                    <VolumeX className="w-4 h-4" />
+                  ) : (
+                    <Volume2 className="w-4 h-4" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.02"
+                  value={volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="w-20 h-1 cursor-pointer accent-[#9b87f5]"
+                  aria-label="Volume"
+                />
+              </div>
             </div>
           </div>
         </motion.div>

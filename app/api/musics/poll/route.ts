@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -97,6 +98,14 @@ export async function GET(request: NextRequest) {
     if (prediction.status === 'failed' || prediction.status === 'canceled') {
       const errorMsg = prediction.error ? String(prediction.error) : 'Generation failed'
 
+      // Fetch credits_used from first music record (total for the batch)
+      const { data: musicRecord } = await supabase
+        .from('musics')
+        .select('credits_used')
+        .eq('id', musicIds[0])
+        .eq('user_id', user.id)
+        .single()
+
       await Promise.all(
         musicIds.map((id) =>
           supabase
@@ -106,6 +115,22 @@ export async function GET(request: NextRequest) {
             .eq('user_id', user.id)
         )
       )
+
+      // Refund credits
+      if (musicRecord?.credits_used && musicRecord.credits_used > 0) {
+        const admin = createAdminClient()
+        const { data: userData } = await admin
+          .from('users')
+          .select('credits')
+          .eq('id', user.id)
+          .single()
+        if (userData) {
+          await admin
+            .from('users')
+            .update({ credits: userData.credits + musicRecord.credits_used })
+            .eq('id', user.id)
+        }
+      }
 
       return NextResponse.json({ status: 'failed', error: errorMsg })
     }

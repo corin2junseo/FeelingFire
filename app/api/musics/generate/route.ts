@@ -1,6 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
+
+function calcCreditCost(durationSecs: number, batchSize: number): number {
+  const durationCredits = durationSecs === 120 ? 2 : durationSecs === 180 ? 3 : 1
+  return durationCredits * batchSize
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -28,14 +34,48 @@ export async function POST(request: NextRequest) {
       ? Math.floor(batch_size)
       : 1
 
-  const supabaseClient = supabase
+  const creditCost = calcCreditCost(durationSecs, batchSize)
 
-  // Create batchSize DB records concurrently
+  // ── Credit check & deduction ──────────────────────────────────────────────
+  const admin = createAdminClient()
+
+  const { data: userData, error: userError } = await admin
+    .from('users')
+    .select('credits')
+    .eq('id', user.id)
+    .single()
+
+  if (userError || !userData) {
+    return NextResponse.json({ error: 'Failed to fetch user credits' }, { status: 500 })
+  }
+
+  if (userData.credits < creditCost) {
+    return NextResponse.json(
+      { error: 'Insufficient credits', required: creditCost, available: userData.credits },
+      { status: 402 }
+    )
+  }
+
+  const { error: deductError } = await admin
+    .from('users')
+    .update({ credits: userData.credits - creditCost })
+    .eq('id', user.id)
+
+  if (deductError) {
+    return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 })
+  }
+
+  // ── Create DB records ─────────────────────────────────────────────────────
   const insertResults = await Promise.all(
     Array.from({ length: batchSize }).map(() =>
-      supabaseClient
+      supabase
         .from('musics')
-        .insert({ user_id: user.id, prompt: caption, status: 'generating' })
+        .insert({
+          user_id: user.id,
+          prompt: caption,
+          status: 'generating',
+          credits_used: creditCost,
+        })
         .select()
         .single()
     )
@@ -46,10 +86,15 @@ export async function POST(request: NextRequest) {
     .map(({ data }) => data!.id as string)
 
   if (musicIds.length === 0) {
+    // Refund credits since we couldn't create records
+    await admin
+      .from('users')
+      .update({ credits: userData.credits })
+      .eq('id', user.id)
     return NextResponse.json({ error: 'Failed to create music records' }, { status: 500 })
   }
 
-  // ONE Replicate prediction with batch_size — avoids rate-limiting from N separate calls
+  // ── Start Replicate prediction ─────────────────────────────────────────────
   const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
   const replicateInput: Record<string, unknown> = {
@@ -65,21 +110,24 @@ export async function POST(request: NextRequest) {
       input: replicateInput,
     })
 
-    // Return ordered items — items[i].musicId corresponds to output[i] from Replicate
     return NextResponse.json({
       predictionId: prediction.id,
       items: musicIds.map((musicId) => ({ musicId })),
     })
   } catch (err) {
-    // Mark all created records as failed
-    await Promise.all(
-      musicIds.map((id) =>
-        supabaseClient
+    // Mark all created records as failed and refund credits
+    await Promise.all([
+      ...musicIds.map((id) =>
+        supabase
           .from('musics')
           .update({ status: 'failed', error_message: String(err) })
           .eq('id', id)
-      )
-    )
+      ),
+      admin
+        .from('users')
+        .update({ credits: userData.credits })
+        .eq('id', user.id),
+    ])
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

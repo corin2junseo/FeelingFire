@@ -1,6 +1,11 @@
 "use client";
 
 import { MinimalistHero } from "@/components/MinimalistHero";
+import { FeaturesSection } from "@/components/FeaturesSection";
+import { ExampleSection } from "@/components/ExampleSection";
+import { PricingSection } from "@/components/PricingSection";
+import { CTASection } from "@/components/CTASection";
+import { Footer } from "@/components/Footer";
 
 export default function Home() {
     const navLinks = [
@@ -23,6 +28,11 @@ export default function Home() {
                     part2: "Your Music",
                 }}
             />
+            <FeaturesSection />
+            <ExampleSection />
+            <PricingSection />
+            <CTASection />
+            <Footer />
         </main>
     );
 }

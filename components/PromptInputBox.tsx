@@ -11,11 +11,20 @@ import {
   Clock,
   Layers,
   Check,
+  Zap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const cn = (...classes: (string | undefined | null | false)[]) =>
   classes.filter(Boolean).join(" ");
+
+// ── Credit cost helpers ────────────────────────────────────────────────────────
+// durationCredits: 1min→1, 2min→2, 3min→3
+// total = durationCredits × batchSize  (e.g. 2min × 3 = 6)
+export function calcCreditCost(duration: number, batchSize: number): number {
+  const durationCredits = duration === 120 ? 2 : duration === 180 ? 3 : 1;
+  return durationCredits * batchSize;
+}
 
 // ── Textarea ──────────────────────────────────────────────────────────────────
 interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -334,9 +343,9 @@ const LyricsModal: React.FC<LyricsModalProps> = ({
 
 // ── DurationPopover ───────────────────────────────────────────────────────────
 const DURATION_OPTIONS = [
-  { label: "1 min", value: 60 },
-  { label: "2 min", value: 120 },
-  { label: "3 min", value: 180 },
+  { label: "1 min", value: 60, credits: 1 },
+  { label: "2 min", value: 120, credits: 2 },
+  { label: "3 min", value: 180, credits: 3 },
 ];
 
 interface DurationPopoverProps {
@@ -374,7 +383,7 @@ const DurationPopover: React.FC<DurationPopoverProps> = ({ value, onChange }) =>
         )}
       >
         <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-        <span>{currentLabel}</span>
+        <span className="hidden sm:inline">{currentLabel}</span>
       </button>
 
       <AnimatePresence>
@@ -384,7 +393,7 @@ const DurationPopover: React.FC<DurationPopoverProps> = ({ value, onChange }) =>
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 4 }}
             transition={{ duration: 0.12 }}
-            className="absolute bottom-full left-0 mb-2 z-50 bg-[#2A2A2E] border border-[#444] rounded-xl shadow-xl overflow-hidden min-w-[110px]"
+            className="absolute bottom-full left-0 mb-2 z-50 bg-[#2A2A2E] border border-[#444] rounded-xl shadow-xl overflow-hidden min-w-[140px]"
           >
             {DURATION_OPTIONS.map((opt) => (
               <button
@@ -400,8 +409,14 @@ const DurationPopover: React.FC<DurationPopoverProps> = ({ value, onChange }) =>
                     : "text-gray-300 hover:bg-[#333] hover:text-white"
                 )}
               >
-                {opt.label}
-                {value === opt.value && <Check className="w-3 h-3" />}
+                <span>{opt.label}</span>
+                <span className={cn(
+                  "text-[11px] flex items-center gap-0.5",
+                  opt.credits > 1 ? "text-amber-400/70" : "text-gray-600"
+                )}>
+                  {opt.credits} cr
+                  {value === opt.value && <Check className="w-3 h-3 ml-1" />}
+                </span>
               </button>
             ))}
           </motion.div>
@@ -444,7 +459,7 @@ const BatchSizePopover: React.FC<BatchSizePopoverProps> = ({ value, onChange }) 
         )}
       >
         <Layers className="w-3.5 h-3.5 flex-shrink-0" />
-        <span>×{value}</span>
+        <span className="hidden sm:inline">×{value}</span>
       </button>
 
       <AnimatePresence>
@@ -459,21 +474,28 @@ const BatchSizePopover: React.FC<BatchSizePopoverProps> = ({ value, onChange }) 
             <p className="text-[11px] text-gray-500 px-1 pb-1.5">Variations</p>
             <div className="flex gap-1.5">
               {[1, 2, 3, 4].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => {
-                    onChange(n);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
-                    value === n
-                      ? "bg-[#9b87f5] text-white"
-                      : "bg-[#333] text-gray-300 hover:bg-[#444] hover:text-white"
-                  )}
-                >
-                  {n}
-                </button>
+                <div key={n} className="flex flex-col items-center gap-1">
+                  <button
+                    onClick={() => {
+                      onChange(n);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
+                      value === n
+                        ? "bg-[#9b87f5] text-white"
+                        : "bg-[#333] text-gray-300 hover:bg-[#444] hover:text-white"
+                    )}
+                  >
+                    {n}
+                  </button>
+                  <span className={cn(
+                    "text-[10px]",
+                    n === 1 ? "text-gray-600" : "text-amber-400/70"
+                  )}>
+                    {n === 1 ? "base" : `+${n - 1}`}
+                  </span>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -496,6 +518,8 @@ interface PromptInputBoxProps {
   isLoading?: boolean;
   placeholder?: string;
   className?: string;
+  userCredits?: number;
+  onInsufficientCredits?: () => void;
 }
 export const PromptInputBox = React.forwardRef(
   (props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
@@ -504,6 +528,8 @@ export const PromptInputBox = React.forwardRef(
       isLoading = false,
       placeholder = "Describe the music style, mood, genre…",
       className,
+      userCredits,
+      onInsufficientCredits,
     } = props;
 
     const [input, setInput] = React.useState("");
@@ -515,8 +541,15 @@ export const PromptInputBox = React.forwardRef(
     const hasContent = input.trim() !== "";
     const hasLyrics = lyrics.trim() !== "";
 
+    const creditCost = calcCreditCost(duration, batchSize);
+    const hasEnoughCredits = userCredits === undefined || userCredits >= creditCost;
+
     const handleSubmit = () => {
       if (!hasContent) return;
+      if (!hasEnoughCredits) {
+        onInsufficientCredits?.();
+        return;
+      }
       onSend(input.trim(), { lyrics, duration, batchSize });
       setInput("");
     };
@@ -558,7 +591,7 @@ export const PromptInputBox = React.forwardRef(
                   )}
                 >
                   <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>Lyrics</span>
+                  <span className="hidden sm:inline">Lyrics</span>
                   {hasLyrics && (
                     <span className="w-1.5 h-1.5 rounded-full bg-[#9b87f5] flex-shrink-0" />
                   )}
@@ -576,27 +609,57 @@ export const PromptInputBox = React.forwardRef(
               <BatchSizePopover value={batchSize} onChange={setBatchSize} />
             </div>
 
-            {/* Right: Send / Stop */}
-            <PromptInputAction
-              tooltip={isLoading ? "Generating…" : "Send"}
-            >
-              <button
-                className={cn(
-                  "h-8 w-8 rounded-full flex items-center justify-center transition-all duration-200",
-                  hasContent
-                    ? "bg-white hover:bg-white/80 text-[#1F2023]"
-                    : "bg-transparent text-[#9CA3AF] cursor-default"
-                )}
-                onClick={handleSubmit}
-                disabled={!hasContent || isLoading}
+            {/* Right: Credit cost + Send / Stop */}
+            <div className="flex items-center gap-2">
+              {/* Credit cost badge */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={creditCost}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.85 }}
+                  transition={{ duration: 0.15 }}
+                  className={cn(
+                    "flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium border",
+                    !hasEnoughCredits
+                      ? "bg-red-500/10 border-red-500/30 text-red-400"
+                      : "bg-amber-400/[0.08] border-amber-400/20 text-amber-400/80"
+                  )}
+                >
+                  <Zap className="w-2.5 h-2.5 fill-current" />
+                  <span>{creditCost}</span>
+                </motion.div>
+              </AnimatePresence>
+
+              <PromptInputAction
+                tooltip={
+                  !hasEnoughCredits
+                    ? "Not enough credits"
+                    : isLoading
+                    ? "Generating…"
+                    : "Send"
+                }
               >
-                {isLoading ? (
-                  <Square className="h-4 w-4 fill-[#1F2023] animate-pulse" />
-                ) : (
-                  <ArrowUp className="h-4 w-4" />
-                )}
-              </button>
-            </PromptInputAction>
+                <button
+                  className={cn(
+                    "h-8 w-8 rounded-full flex items-center justify-center transition-all duration-200",
+                    hasContent && hasEnoughCredits
+                      ? "bg-white hover:bg-white/80 text-[#1F2023]"
+                      : hasContent && !hasEnoughCredits
+                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30 cursor-pointer"
+                      : "bg-transparent text-[#9CA3AF] cursor-default"
+                  )}
+                  onClick={handleSubmit}
+                  disabled={!hasContent || isLoading}
+                >
+                  {isLoading ? (
+                    <Square className="h-4 w-4 fill-[#1F2023] animate-pulse" />
+                  ) : (
+                    <ArrowUp className="h-4 w-4" />
+                  )}
+                </button>
+              </PromptInputAction>
+            </div>
           </PromptInputActions>
         </PromptInput>
 
