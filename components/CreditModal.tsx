@@ -18,6 +18,7 @@ const plans = [
 export function CreditModal({ open, onClose }: CreditModalProps) {
     const [mounted, setMounted] = useState(false);
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const { user } = useAuth();
 
     useEffect(() => {
@@ -30,6 +31,7 @@ export function CreditModal({ open, onClose }: CreditModalProps) {
         if (!user || loadingPlan) return;
 
         setLoadingPlan(planId);
+        setErrorMsg(null);
         try {
             const res = await fetch("/api/checkout", {
                 method: "POST",
@@ -37,11 +39,17 @@ export function CreditModal({ open, onClose }: CreditModalProps) {
                 body: JSON.stringify({ plan: planId }),
             });
 
-            if (!res.ok) throw new Error("Failed to create checkout");
+            const data = await res.json();
 
-            const { url } = await res.json();
-            window.location.href = url;
-        } catch {
+            if (!res.ok) {
+                setErrorMsg(data.error ?? "Failed to create checkout");
+                setLoadingPlan(null);
+                return;
+            }
+
+            window.location.href = data.url;
+        } catch (e) {
+            setErrorMsg(e instanceof Error ? e.message : "Unknown error");
             setLoadingPlan(null);
         }
     }
@@ -72,6 +80,11 @@ export function CreditModal({ open, onClose }: CreditModalProps) {
                         className="relative z-10 flex gap-4"
                         onClick={(e) => e.stopPropagation()}
                     >
+                        {errorMsg && (
+                            <div className="absolute -top-10 left-0 right-0 text-center text-xs text-red-400">
+                                {errorMsg}
+                            </div>
+                        )}
                         {plans.map((plan) => {
                             const isLoading = loadingPlan === plan.id;
                             const isDisabled = !!loadingPlan;
