@@ -476,4 +476,4 @@ vercel --prod
 
 ## 라이선스
 
-© 2024 Feelingfire. All rights reserved.
+© 2026 Feelingfire. All rights reserved.
