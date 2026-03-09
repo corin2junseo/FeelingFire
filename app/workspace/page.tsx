@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { WorkspaceNavbar } from "@/components/WorkspaceNavbar";
 import { PromptInputBox, type MusicOptions } from "@/components/PromptInputBox";
 import { MusicList } from "@/components/MusicList";
@@ -35,10 +35,18 @@ export default function WorkspacePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [creditModalOpen, setCreditModalOpen] = useState(false);
   const pollingItemsRef = useRef<PollingItem[]>([]);
+  const pollingActiveRef = useRef(false);
+  // Stable ref so Realtime callback can call refreshCredits without stale closure
+  const refreshCreditsRef = useRef(refreshCredits);
 
   useEffect(() => {
     pollingItemsRef.current = pollingItems;
+    pollingActiveRef.current = pollingItems.length > 0;
   }, [pollingItems]);
+
+  useEffect(() => {
+    refreshCreditsRef.current = refreshCredits;
+  }, [refreshCredits]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -59,7 +67,7 @@ export default function WorkspacePage() {
       try {
         const { data } = await supabase
           .from("musics")
-          .select("*")
+          .select("id, user_id, prompt, title, mood, genre, duration, file_path, file_url, status, error_message, created_at, updated_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
         if (data) setMusics(data as Music[]);
@@ -69,74 +77,104 @@ export default function WorkspacePage() {
     })();
   }, [user]);
 
-  // Poll Replicate status every POLL_INTERVAL_MS
+  // Supabase Realtime: DB UPDATE → 즉시 UI 반영 (폴링 응답 처리 불필요)
   useEffect(() => {
-    if (pollingItems.length === 0) return;
+    if (!user) return;
+    const supabase = createClient();
 
-    const interval = setInterval(async () => {
+    const channel = supabase
+      .channel(`musics-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "musics",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as Music;
+
+          // DB row 전체로 로컬 상태 갱신 (file_url 포함)
+          setMusics((prev) =>
+            prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
+          );
+
+          // 완료 또는 실패 시 해당 musicId를 pollingItems에서 제거
+          if (updated.status === "completed" || updated.status === "failed") {
+            setPollingItems((prev) =>
+              prev
+                .map((p) => ({
+                  ...p,
+                  musicIds: p.musicIds.filter((id) => id !== updated.id),
+                }))
+                .filter((p) => p.musicIds.length > 0)
+            );
+
+            // 실패(환불 발생) 시 크레딧 표시 즉시 갱신
+            if (updated.status === "failed") {
+              refreshCreditsRef.current();
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // Replicate 상태 확인 트리거 (fire-and-forget)
+  // UI 갱신은 Supabase Realtime이 담당하므로 응답 처리 불필요.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!pollingActiveRef.current) return;
       const current = pollingItemsRef.current;
       if (current.length === 0) return;
 
-      const results = await Promise.all(
-        current.map(async (item) => {
-          if (item.attempts >= MAX_POLL_ATTEMPTS) {
-            return { ...item, status: "failed", error: "Generation timed out" };
-          }
-          try {
-            const musicIdsParam = item.musicIds.join(",");
-            const res = await fetch(
-              `/api/musics/poll?predictionId=${item.predictionId}&musicIds=${musicIdsParam}`
-            );
-            const data = await res.json();
-            return { ...item, attempts: item.attempts + 1, ...data };
-          } catch {
-            return { ...item, attempts: item.attempts + 1, status: "processing" };
-          }
-        })
-      );
+      const timedOut: PollingItem[] = [];
+      const active: PollingItem[] = [];
 
-      const done = results.filter(
-        (r) => r.status === "completed" || r.status === "failed"
-      );
-      const stillPending = results.filter(
-        (r) => r.status !== "completed" && r.status !== "failed"
-      );
+      for (const item of current) {
+        if (item.attempts >= MAX_POLL_ATTEMPTS) {
+          timedOut.push(item);
+        } else {
+          active.push(item);
+          // 서버에 Replicate 상태 확인 요청 (응답 불필요 — Realtime이 UI 처리)
+          const musicIdsParam = item.musicIds.join(",");
+          fetch(
+            `/api/musics/poll?predictionId=${item.predictionId}&musicIds=${musicIdsParam}`
+          ).catch(() => {});
+        }
+      }
 
-      if (done.length > 0) {
+      // 타임아웃 항목: 크레딧 환불 + 로컬 상태 실패 처리
+      if (timedOut.length > 0) {
+        const timedOutIds = timedOut.flatMap((i) => i.musicIds);
+        fetch("/api/musics/refund", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ musicIds: timedOutIds }),
+        }).catch(() => {});
         setMusics((prev) =>
-          prev.map((m) => {
-            for (const result of done) {
-              if (result.status === "completed") {
-                const match = (
-                  result.items as { musicId: string; fileUrl: string | null }[]
-                )?.find((it) => it.musicId === m.id);
-                if (match) return { ...m, status: "completed", file_url: match.fileUrl };
-              } else if (result.status === "failed") {
-                if ((result.musicIds as string[])?.includes(m.id)) {
-                  return {
-                    ...m,
-                    status: "failed",
-                    error_message: result.error ?? "Generation failed",
-                  };
-                }
-              }
-            }
-            return m;
-          })
+          prev.map((m) =>
+            timedOutIds.includes(m.id)
+              ? { ...m, status: "failed", error_message: "Generation timed out" }
+              : m
+          )
         );
       }
 
+      // 타임아웃 항목 제거 + 나머지 attempts 증가
       setPollingItems(
-        stillPending.map((r) => ({
-          musicIds: r.musicIds,
-          predictionId: r.predictionId,
-          attempts: r.attempts,
-        }))
+        active.map((item) => ({ ...item, attempts: item.attempts + 1 }))
       );
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [pollingItems]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSend = async (caption: string, options: MusicOptions) => {
     const { lyrics, duration, batchSize } = options;
@@ -246,15 +284,20 @@ export default function WorkspacePage() {
     }
   };
 
-  const handleRename = async (id: string, newTitle: string) => {
+  const handleRename = useCallback(async (id: string, newTitle: string) => {
     const supabase = createClient();
-    await supabase.from("musics").update({ title: newTitle }).eq("id", id);
-    setMusics((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, title: newTitle } : m))
-    );
-  };
+    const { error } = await supabase
+      .from("musics")
+      .update({ title: newTitle })
+      .eq("id", id);
+    if (!error) {
+      setMusics((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, title: newTitle } : m))
+      );
+    }
+  }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     const supabase = createClient();
     await supabase.from("musics").delete().eq("id", id);
     setMusics((prev) => prev.filter((m) => m.id !== id));
@@ -263,7 +306,7 @@ export default function WorkspacePage() {
         .map((p) => ({ ...p, musicIds: p.musicIds.filter((mid) => mid !== id) }))
         .filter((p) => p.musicIds.length > 0)
     );
-  };
+  }, []);
 
   if (loading) {
     return (

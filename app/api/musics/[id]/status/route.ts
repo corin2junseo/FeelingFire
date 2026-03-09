@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { addToCache } from '@/lib/credits'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -84,11 +86,38 @@ export async function GET(
 
     if (prediction.status === 'failed' || prediction.status === 'canceled') {
       const errorMsg = prediction.error ? String(prediction.error) : 'Generation failed'
+
+      // Fetch credits_used before marking failed
+      const { data: musicRecord, error: recordError } = await supabase
+        .from('musics')
+        .select('credits_used')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (recordError) {
+        console.error('[status] Failed to fetch credits_used:', recordError)
+      }
+
       await supabase
         .from('musics')
         .update({ status: 'failed', error_message: errorMsg })
         .eq('id', id)
         .eq('user_id', user.id)
+
+      // Refund credits via RPC (atomic)
+      if (musicRecord?.credits_used && musicRecord.credits_used > 0) {
+        const admin = createAdminClient()
+        const { error: refundError } = await admin.rpc('increment_user_credits', {
+          p_user_id: user.id,
+          p_amount: musicRecord.credits_used,
+        })
+        if (refundError) {
+          console.error('[status] Credit refund failed:', refundError)
+        } else {
+          await addToCache(user.id, musicRecord.credits_used)
+        }
+      }
 
       return NextResponse.json({ status: 'failed', error: errorMsg })
     }

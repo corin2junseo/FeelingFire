@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateEvent, WebhookVerificationError } from "@polar-sh/sdk/webhooks";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { addToCache } from "@/lib/credits";
 
 const CREDITS_MAP: Record<string, number> = {
     [process.env.POLAR_PRO_PRODUCT_ID!]: 30,
@@ -15,8 +16,6 @@ export async function POST(req: NextRequest) {
         headers[key] = value;
     });
 
-    console.log("[webhook] 수신됨, event type 파싱 중...");
-
     let event;
     try {
         event = validateEvent(body, headers, process.env.POLAR_WEBHOOK_SECRET!);
@@ -28,19 +27,11 @@ export async function POST(req: NextRequest) {
         throw e;
     }
 
-    console.log("[webhook] event.type:", event.type);
-
     if (event.type === "order.paid") {
         const order = event.data;
         const userId = order.customer.externalId;
         const productId = order.productId;
         const credits = productId ? (CREDITS_MAP[productId] ?? 0) : 0;
-
-        console.log("[webhook] order.id:", order.id);
-        console.log("[webhook] userId (externalId):", userId);
-        console.log("[webhook] productId:", productId);
-        console.log("[webhook] credits:", credits);
-        console.log("[webhook] CREDITS_MAP:", CREDITS_MAP);
 
         if (!userId) {
             console.warn("[webhook] userId 없음 → externalCustomerId가 결제 생성 시 전달되지 않았음");
@@ -64,7 +55,7 @@ export async function POST(req: NextRequest) {
 
         if (error) {
             if (error.code === "23505") {
-                console.log("[webhook] 이미 처리된 주문 (duplicate), 무시");
+                console.warn("[webhook] 이미 처리된 주문 (duplicate), 무시");
                 return NextResponse.json({ received: true });
             }
             console.error("[webhook] payments insert 오류:", error);
@@ -81,7 +72,8 @@ export async function POST(req: NextRequest) {
             throw rpcError;
         }
 
-        console.log(`[webhook] 완료 — userId: ${userId}, credits +${credits}`);
+        // Supabase RPC 성공 후 Redis 캐시 동기화
+        await addToCache(userId, credits)
     }
 
     return NextResponse.json({ received: true });

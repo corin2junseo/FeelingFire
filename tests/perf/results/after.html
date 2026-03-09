@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>k6 Performance Report — Feelingfire</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #0f1117; color: #e2e8f0; padding: 32px; }
+  h1   { font-size: 1.6rem; font-weight: 700; margin-bottom: 4px; color: #f8fafc; }
+  .sub { color: #94a3b8; font-size: 0.85rem; margin-bottom: 32px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              gap: 16px; margin-bottom: 40px; }
+  .kpi { background: #1e2230; border: 1px solid #2d3249; border-radius: 12px;
+         padding: 20px 24px; }
+  .kpi-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase;
+               letter-spacing: .05em; margin-bottom: 8px; }
+  .kpi-value { font-size: 2rem; font-weight: 700; color: #38bdf8; }
+  .kpi-value.good { color: #4ade80; }
+  .kpi-value.warn { color: #fbbf24; }
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .chart-card { background: #1e2230; border: 1px solid #2d3249;
+                border-radius: 12px; padding: 24px; }
+  .chart-title { font-size: 0.9rem; font-weight: 600; color: #cbd5e1;
+                 margin-bottom: 16px; }
+  canvas { max-height: 260px; }
+  @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>k6 Performance Report — Feelingfire</h1>
+<p class="sub">Generated: 2026. 3. 6. PM 8:22:43 &nbsp;|&nbsp; Source: after.json</p>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-label">avg Response Time</div>
+    <div class="kpi-value warn">311.78 ms</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">p(95) Response Time</div>
+    <div class="kpi-value warn">409.40 ms</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Total Requests</div>
+    <div class="kpi-value">1,061</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Error Count</div>
+    <div class="kpi-value warn">2</div>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card">
+    <div class="chart-title">Response Time over Time (avg &amp; p95)</div>
+    <canvas id="durChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Requests per Second</div>
+    <canvas id="rpsChart"></canvas>
+  </div>
+</div>
+
+<script>
+const GRID  = { color: 'rgba(255,255,255,0.05)' }
+const FONT  = { color: '#94a3b8', size: 11 }
+const BASE  = { responsive: true, animation: false, plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 12 } } },
+                scales: { x: { ticks: FONT, grid: GRID }, y: { ticks: FONT, grid: GRID } } }
+
+new Chart(document.getElementById('durChart'), {
+  type: 'line',
+  data: {
+    datasets: [
+      { label: 'avg (ms)', data: [{"x":0,"y":0},{"x":2,"y":882.35},{"x":3,"y":115.15},{"x":4,"y":459.68},{"x":5,"y":216.91},{"x":6,"y":267.94},{"x":7,"y":253.58},{"x":8,"y":283.5},{"x":9,"y":272.2},{"x":10,"y":263.78},{"x":11,"y":311.99},{"x":12,"y":288.73},{"x":13,"y":281.44},{"x":14,"y":276.63},{"x":15,"y":284.16},{"x":16,"y":295.75},{"x":17,"y":310.28},{"x":18,"y":308.91},{"x":19,"y":282.32},{"x":20,"y":300.72},{"x":21,"y":287.45},{"x":22,"y":294.33},{"x":23,"y":287.81},{"x":24,"y":304.35},{"x":25,"y":308.89},{"x":26,"y":301.44},{"x":27,"y":308.3},{"x":28,"y":302.02},{"x":29,"y":313.98},{"x":30,"y":323.96},{"x":31,"y":312.57},{"x":32,"y":318.75},{"x":33,"y":305.28},{"x":34,"y":335.01},{"x":35,"y":346.87},{"x":36,"y":307.67},{"x":37,"y":338.74},{"x":38,"y":312},{"x":39,"y":310.57},{"x":40,"y":340.07},{"x":41,"y":316.96},{"x":42,"y":322.04},{"x":43,"y":300.56},{"x":44,"y":300.21},{"x":45,"y":335.21},{"x":46,"y":310.71},{"x":47,"y":301.45},{"x":48,"y":329.04},{"x":49,"y":308.66},{"x":50,"y":301.46},{"x":51,"y":321.84},{"x":52,"y":320.49},{"x":53,"y":319.81},{"x":54,"y":311.94},{"x":55,"y":312.6},{"x":56,"y":311.34},{"x":57,"y":302.43},{"x":58,"y":302.52},{"x":59,"y":297.17},{"x":60,"y":303.44},{"x":61,"y":297.28},{"x":62,"y":319.61},{"x":63,"y":304.16},{"x":64,"y":295.74},{"x":65,"y":294.45},{"x":66,"y":297.55},{"x":67,"y":300.83},{"x":68,"y":346.42},{"x":69,"y":329.17},{"x":70,"y":315.31},{"x":71,"y":323.68},{"x":72,"y":340.55},{"x":73,"y":300.15},{"x":74,"y":300.26},{"x":75,"y":317.4},{"x":76,"y":312.47},{"x":77,"y":317.3},{"x":78,"y":326.13},{"x":79,"y":309.6},{"x":80,"y":311.12},{"x":81,"y":361.16},{"x":82,"y":368.81},{"x":83,"y":310.42},{"x":84,"y":355.6},{"x":85,"y":324.14},{"x":86,"y":320.73},{"x":87,"y":302.02},{"x":88,"y":305.86},{"x":89,"y":300.91},{"x":90,"y":330.91},{"x":91,"y":304.17},{"x":92,"y":312.6},{"x":93,"y":306.42},{"x":94,"y":329.74},{"x":95,"y":312.64},{"x":96,"y":360.51},{"x":97,"y":299.59},{"x":98,"y":302.07},{"x":99,"y":299.16},{"x":100,"y":295.99},{"x":101,"y":296.23},{"x":102,"y":299.31},{"x":103,"y":294.38},{"x":104,"y":300.04},{"x":108,"y":310.89},{"x":112,"y":301.06},{"x":116,"y":450.73},{"x":120,"y":310.72}],
+        borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)',
+        pointRadius: 0, borderWidth: 2, fill: true, tension: 0.3, parsing: { xAxisKey: 'x', yAxisKey: 'y' } },
+      { label: 'p95 (ms)', data: [{"x":0,"y":0},{"x":2,"y":882.35},{"x":3,"y":115.15},{"x":4,"y":1045.42},{"x":5,"y":319.52},{"x":6,"y":378.54},{"x":7,"y":329.4},{"x":8,"y":362.56},{"x":9,"y":321.21},{"x":10,"y":309.05},{"x":11,"y":328.48},{"x":12,"y":350.32},{"x":13,"y":320.18},{"x":14,"y":319.63},{"x":15,"y":329.48},{"x":16,"y":337.41},{"x":17,"y":427.64},{"x":18,"y":409.67},{"x":19,"y":326.12},{"x":20,"y":329.57},{"x":21,"y":389.6},{"x":22,"y":370.03},{"x":23,"y":410.75},{"x":24,"y":423.04},{"x":25,"y":428.65},{"x":26,"y":386.68},{"x":27,"y":449.39},{"x":28,"y":397.56},{"x":29,"y":426.92},{"x":30,"y":411.43},{"x":31,"y":408.36},{"x":32,"y":449.69},{"x":33,"y":314.45},{"x":34,"y":538.54},{"x":35,"y":438.82},{"x":36,"y":418.36},{"x":37,"y":420.6},{"x":38,"y":360.38},{"x":39,"y":328.31},{"x":40,"y":458.97},{"x":41,"y":408.64},{"x":42,"y":419.22},{"x":43,"y":310.28},{"x":44,"y":319.4},{"x":45,"y":440.1},{"x":46,"y":411.41},{"x":47,"y":318.13},{"x":48,"y":409.33},{"x":49,"y":399.49},{"x":50,"y":321},{"x":51,"y":401},{"x":52,"y":409.52},{"x":53,"y":410.13},{"x":54,"y":409.53},{"x":55,"y":441.72},{"x":56,"y":400},{"x":57,"y":318.88},{"x":58,"y":330.74},{"x":59,"y":320.09},{"x":60,"y":389.21},{"x":61,"y":311.89},{"x":62,"y":429.37},{"x":63,"y":318.43},{"x":64,"y":319.04},{"x":65,"y":309.22},{"x":66,"y":329.63},{"x":67,"y":363.05},{"x":68,"y":451.77},{"x":69,"y":503.47},{"x":70,"y":399.66},{"x":71,"y":413.32},{"x":72,"y":464.3},{"x":73,"y":323.93},{"x":74,"y":318.01},{"x":75,"y":408.72},{"x":76,"y":410.29},{"x":77,"y":395.97},{"x":78,"y":390.67},{"x":79,"y":318.68},{"x":80,"y":323.7},{"x":81,"y":442.31},{"x":82,"y":692.57},{"x":83,"y":404.99},{"x":84,"y":418.66},{"x":85,"y":397.59},{"x":86,"y":452.51},{"x":87,"y":332.73},{"x":88,"y":367.11},{"x":89,"y":318.04},{"x":90,"y":438.34},{"x":91,"y":329.29},{"x":92,"y":408.72},{"x":93,"y":314.71},{"x":94,"y":403.95},{"x":95,"y":321.67},{"x":96,"y":510.14},{"x":97,"y":309.96},{"x":98,"y":309.08},{"x":99,"y":318.31},{"x":100,"y":309.15},{"x":101,"y":300.4},{"x":102,"y":299.85},{"x":103,"y":298.95},{"x":104,"y":310.71},{"x":108,"y":310.89},{"x":112,"y":301.06},{"x":116,"y":450.73},{"x":120,"y":310.72}],
+        borderColor: '#f472b6', backgroundColor: 'transparent',
+        pointRadius: 0, borderWidth: 1.5, borderDash: [4,3], tension: 0.3, parsing: { xAxisKey: 'x', yAxisKey: 'y' } },
+    ]
+  },
+  options: { ...BASE, scales: { ...BASE.scales,
+    x: { ...BASE.scales.x, title: { display: true, text: 'seconds', color: '#64748b' } },
+    y: { ...BASE.scales.y, title: { display: true, text: 'ms', color: '#64748b' } },
+  }}
+})
+
+new Chart(document.getElementById('rpsChart'), {
+  type: 'bar',
+  data: {
+    datasets: [{
+      label: 'req/s', data: [{"x":0,"y":2},{"x":2,"y":1},{"x":3,"y":1},{"x":4,"y":4},{"x":5,"y":2},{"x":6,"y":3},{"x":7,"y":3},{"x":8,"y":5},{"x":9,"y":5},{"x":10,"y":4},{"x":11,"y":4},{"x":12,"y":7},{"x":13,"y":6},{"x":14,"y":6},{"x":15,"y":7},{"x":16,"y":7},{"x":17,"y":7},{"x":18,"y":10},{"x":19,"y":8},{"x":20,"y":8},{"x":21,"y":9},{"x":22,"y":11},{"x":23,"y":9},{"x":24,"y":12},{"x":25,"y":9},{"x":26,"y":10},{"x":27,"y":14},{"x":28,"y":13},{"x":29,"y":12},{"x":30,"y":11},{"x":31,"y":12},{"x":32,"y":15},{"x":33,"y":12},{"x":34,"y":12},{"x":35,"y":11},{"x":36,"y":14},{"x":37,"y":11},{"x":38,"y":13},{"x":39,"y":12},{"x":40,"y":15},{"x":41,"y":11},{"x":42,"y":10},{"x":43,"y":13},{"x":44,"y":15},{"x":45,"y":13},{"x":46,"y":10},{"x":47,"y":13},{"x":48,"y":14},{"x":49,"y":13},{"x":50,"y":11},{"x":51,"y":11},{"x":52,"y":15},{"x":53,"y":12},{"x":54,"y":13},{"x":55,"y":11},{"x":56,"y":14},{"x":57,"y":11},{"x":58,"y":14},{"x":59,"y":12},{"x":60,"y":13},{"x":61,"y":12},{"x":62,"y":14},{"x":63,"y":12},{"x":64,"y":13},{"x":65,"y":12},{"x":66,"y":14},{"x":67,"y":12},{"x":68,"y":13},{"x":69,"y":12},{"x":70,"y":11},{"x":71,"y":12},{"x":72,"y":14},{"x":73,"y":13},{"x":74,"y":12},{"x":75,"y":12},{"x":76,"y":13},{"x":77,"y":13},{"x":78,"y":12},{"x":79,"y":12},{"x":80,"y":13},{"x":81,"y":12},{"x":82,"y":11},{"x":83,"y":13},{"x":84,"y":14},{"x":85,"y":11},{"x":86,"y":12},{"x":87,"y":12},{"x":88,"y":14},{"x":89,"y":13},{"x":90,"y":11},{"x":91,"y":12},{"x":92,"y":12},{"x":93,"y":9},{"x":94,"y":12},{"x":95,"y":7},{"x":96,"y":10},{"x":97,"y":6},{"x":98,"y":5},{"x":99,"y":7},{"x":100,"y":7},{"x":101,"y":3},{"x":102,"y":2},{"x":103,"y":2},{"x":104,"y":3},{"x":108,"y":1},{"x":112,"y":1},{"x":116,"y":1},{"x":120,"y":1}],
+      backgroundColor: 'rgba(74,222,128,0.7)', borderColor: '#4ade80', borderWidth: 1,
+      parsing: { xAxisKey: 'x', yAxisKey: 'y' }
+    }]
+  },
+  options: { ...BASE, scales: { ...BASE.scales,
+    x: { ...BASE.scales.x, title: { display: true, text: 'seconds', color: '#64748b' } },
+    y: { ...BASE.scales.y, title: { display: true, text: 'req/s', color: '#64748b' } },
+  }}
+})
+</script>
+</body>
+</html>

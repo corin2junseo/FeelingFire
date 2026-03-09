@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { generateRatelimit } from '@/lib/redis'
+import { deductCredits, addToCache } from '@/lib/credits'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -14,6 +16,22 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Rate limit: 유저당 분당 10회 제한 (credits 조회 전에 차단)
+  const { success, limit, remaining: rlRemaining, reset } = await generateRatelimit.limit(user.id)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait before generating again.' },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': String(limit),
+          'X-RateLimit-Remaining': String(rlRemaining),
+          'X-RateLimit-Reset': String(reset),
+        },
+      }
+    )
   }
 
   const body = await request.json()
@@ -36,33 +54,13 @@ export async function POST(request: NextRequest) {
 
   const creditCost = calcCreditCost(durationSecs, batchSize)
 
-  // ── Credit check & deduction ──────────────────────────────────────────────
-  const admin = createAdminClient()
-
-  const { data: userData, error: userError } = await admin
-    .from('users')
-    .select('credits')
-    .eq('id', user.id)
-    .single()
-
-  if (userError || !userData) {
-    return NextResponse.json({ error: 'Failed to fetch user credits' }, { status: 500 })
-  }
-
-  if (userData.credits < creditCost) {
+  // ── Credit check & deduction (Redis atomic DECRBY + async Supabase sync) ──
+  const { ok, remaining } = await deductCredits(user.id, creditCost)
+  if (!ok) {
     return NextResponse.json(
-      { error: 'Insufficient credits', required: creditCost, available: userData.credits },
+      { error: 'Insufficient credits', required: creditCost, available: remaining },
       { status: 402 }
     )
-  }
-
-  const { error: deductError } = await admin
-    .from('users')
-    .update({ credits: userData.credits - creditCost })
-    .eq('id', user.id)
-
-  if (deductError) {
-    return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 })
   }
 
   // ── Create DB records ─────────────────────────────────────────────────────
@@ -86,11 +84,12 @@ export async function POST(request: NextRequest) {
     .map(({ data }) => data!.id as string)
 
   if (musicIds.length === 0) {
-    // Refund credits since we couldn't create records
-    await admin
-      .from('users')
-      .update({ credits: userData.credits })
-      .eq('id', user.id)
+    // Refund credits: RPC updates Supabase, addToCache updates Redis
+    const admin = createAdminClient()
+    await Promise.all([
+      admin.rpc('increment_user_credits', { p_user_id: user.id, p_amount: creditCost }),
+      addToCache(user.id, creditCost),
+    ])
     return NextResponse.json({ error: 'Failed to create music records' }, { status: 500 })
   }
 
@@ -116,6 +115,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     // Mark all created records as failed and refund credits
+    const admin = createAdminClient()
     await Promise.all([
       ...musicIds.map((id) =>
         supabase
@@ -123,10 +123,8 @@ export async function POST(request: NextRequest) {
           .update({ status: 'failed', error_message: String(err) })
           .eq('id', id)
       ),
-      admin
-        .from('users')
-        .update({ credits: userData.credits })
-        .eq('id', user.id),
+      admin.rpc('increment_user_credits', { p_user_id: user.id, p_amount: creditCost }),
+      addToCache(user.id, creditCost),
     ])
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

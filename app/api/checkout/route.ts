@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Polar } from "@polar-sh/sdk";
-import { createClient } from "@/lib/supabase/server";
+import { createEdgeClient } from "@/lib/supabase/edge";
+
+export const runtime = "edge";
 
 const polar = new Polar({
     accessToken: process.env.POLAR_API_TOKEN!,
@@ -13,15 +15,7 @@ const PRODUCT_IDS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-    console.log("[checkout] ENV check:", {
-        hasToken: !!process.env.POLAR_API_TOKEN,
-        hasProId: !!process.env.POLAR_PRO_PRODUCT_ID,
-        hasUltraId: !!process.env.POLAR_ULTRA_PRODUCT_ID,
-        proId: process.env.POLAR_PRO_PRODUCT_ID,
-        ultraId: process.env.POLAR_ULTRA_PRODUCT_ID,
-    });
-
-    const supabase = await createClient();
+    const supabase = createEdgeClient(req);
     const {
         data: { user },
     } = await supabase.auth.getUser();
@@ -32,8 +26,6 @@ export async function POST(req: NextRequest) {
 
     const { plan } = await req.json();
     const productId = PRODUCT_IDS[plan];
-
-    console.log("[checkout] plan:", plan, "productId:", productId);
 
     if (!productId) {
         return NextResponse.json({ error: "Invalid plan — productId is empty" }, { status: 400 });
