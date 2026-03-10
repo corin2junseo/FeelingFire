@@ -46,7 +46,7 @@ function calcStats(times: number[]): Stat {
 }
 
 /** 순차 실행 — Redis처럼 빠른 작업에 적합. 개별 call latency 정확히 측정. */
-async function benchSeq(fn: () => Promise<unknown>, n: number): Promise<number[]> {
+async function benchSeq(fn: () => PromiseLike<unknown>, n: number): Promise<number[]> {
   const times: number[] = []
   for (let i = 0; i < n; i++) {
     const t = performance.now()
@@ -65,7 +65,7 @@ async function benchSeq(fn: () => Promise<unknown>, n: number): Promise<number[]
  * 각 batch의 총 소요시간과 개별 latency를 함께 반환.
  */
 async function benchConcurrent(
-  fn: () => Promise<unknown>,
+  fn: () => PromiseLike<unknown>,
   n: number,
   concurrency: number
 ): Promise<{ times: number[]; totalMs: number; batches: number }> {
