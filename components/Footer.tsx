@@ -35,14 +35,15 @@ const socialLinks = [
     },
 ];
 
-const navLinks = [
+const defaultNavLinks = [
     { label: "Features", href: "#features" },
     { label: "Pricing", href: "#pricing" },
     { label: "Privacy", href: "/privacy" },
     { label: "Terms", href: "/terms" },
 ];
 
-export function Footer() {
+export function Footer({ navLinks }: { navLinks?: { label: string; href: string }[] } = {}) {
+    const links = navLinks ?? defaultNavLinks;
     return (
         <footer className="relative w-full overflow-hidden bg-background">
             {/* Top divider */}
@@ -97,7 +98,7 @@ export function Footer() {
 
                     {/* Right — nav links */}
                     <div className="flex flex-col gap-5 items-end">
-                        {navLinks.map((link, i) => (
+                        {links.map((link, i) => (
                             <motion.a
                                 key={link.label}
                                 href={link.href}

@@ -12,7 +12,16 @@ interface FeatureCard {
     description: string;
 }
 
-const features: FeatureCard[] = [
+interface FeaturesSectionContent {
+    sectionLabel?: string;
+    headingLine1?: string;
+    headingLine2?: string;
+    subheading?: string;
+    ctaText?: string;
+    features?: FeatureCard[];
+}
+
+const defaultFeatures: FeatureCard[] = [
     {
         id: 1,
         image: "/image/1.jpg",
@@ -63,7 +72,14 @@ const features: FeatureCard[] = [
     },
 ];
 
-export function FeaturesSection() {
+export function FeaturesSection({ content }: { content?: FeaturesSectionContent } = {}) {
+    const sectionLabel = content?.sectionLabel ?? "FEATURES";
+    const headingLine1 = content?.headingLine1 ?? "Everything You";
+    const headingLine2 = content?.headingLine2 ?? "Need";
+    const subheading = content?.subheading ?? "Copyright stress, sketchy downloads, mismatched tracks — all the problems creators face, solved in one place.";
+    const ctaText = content?.ctaText ?? "Start for Free →";
+    const features = content?.features ?? defaultFeatures;
+
     return (
         <section
             id="features"
@@ -79,19 +95,18 @@ export function FeaturesSection() {
                     className="mb-16 text-center"
                 >
                     <p className="mb-4 text-xs font-bold tracking-widest text-foreground/50">
-                        FEATURES
+                        {sectionLabel}
                     </p>
                     <h2
                         className="text-5xl font-extrabold leading-tight text-foreground md:text-6xl lg:text-7xl"
                         style={{ fontFamily: "var(--font-pirata-one)" }}
                     >
-                        Everything You
+                        {headingLine1}
                         <br />
-                        Need
+                        {headingLine2}
                     </h2>
                     <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-foreground/60">
-                        Copyright stress, sketchy downloads, mismatched tracks —
-                        all the problems creators face, solved in one place.
+                        {subheading}
                     </p>
                 </motion.div>
 
@@ -175,7 +190,7 @@ export function FeaturesSection() {
                         href="/auth"
                         className="inline-block rounded-full bg-white px-8 py-3.5 text-sm font-bold text-black transition-all hover:scale-105 hover:bg-white/90"
                     >
-                        Start for Free →
+                        {ctaText}
                     </a>
                 </motion.div>
             </div>

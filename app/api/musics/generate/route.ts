@@ -2,13 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateRatelimit } from '@/lib/redis'
 import { deductCredits, addToCache } from '@/lib/credits'
+import { calcCreditCost } from '@/lib/pricing'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
 
-function calcCreditCost(durationSecs: number, batchSize: number): number {
-  const durationCredits = durationSecs === 120 ? 2 : durationSecs === 180 ? 3 : 1
-  return durationCredits * batchSize
-}
+const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -54,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   const creditCost = calcCreditCost(durationSecs, batchSize)
 
-  // ── Credit check & deduction (Redis atomic DECRBY + async Supabase sync) ──
+  // ── Credit check & deduction (Redis atomic Lua script + async Supabase sync) ──
   const { ok, remaining } = await deductCredits(user.id, creditCost)
   if (!ok) {
     return NextResponse.json(
@@ -63,28 +61,20 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // ── Create DB records ─────────────────────────────────────────────────────
-  const insertResults = await Promise.all(
-    Array.from({ length: batchSize }).map(() =>
-      supabase
-        .from('musics')
-        .insert({
-          user_id: user.id,
-          prompt: caption,
-          status: 'generating',
-          credits_used: creditCost,
-        })
-        .select()
-        .single()
+  // ── Batch insert DB records (단일 쿼리) ───────────────────────────────────────
+  const { data: insertedRecords, error: insertError } = await supabase
+    .from('musics')
+    .insert(
+      Array.from({ length: batchSize }, () => ({
+        user_id: user.id,
+        prompt: caption,
+        status: 'generating',
+        credits_used: creditCost,
+      }))
     )
-  )
+    .select()
 
-  const musicIds = insertResults
-    .filter(({ data, error }) => data && !error)
-    .map(({ data }) => data!.id as string)
-
-  if (musicIds.length === 0) {
-    // Refund credits: RPC updates Supabase, addToCache updates Redis
+  if (insertError || !insertedRecords || insertedRecords.length === 0) {
     const admin = createAdminClient()
     await Promise.all([
       admin.rpc('increment_user_credits', { p_user_id: user.id, p_amount: creditCost }),
@@ -93,8 +83,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create music records' }, { status: 500 })
   }
 
+  const musicIds = insertedRecords.map((r) => r.id as string)
+
   // ── Start Replicate prediction ─────────────────────────────────────────────
-  const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
   const replicateInput: Record<string, unknown> = {
     caption,

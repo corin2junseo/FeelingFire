@@ -14,17 +14,9 @@ import {
   Zap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { calcCreditCost } from "@/lib/pricing";
 
-const cn = (...classes: (string | undefined | null | false)[]) =>
-  classes.filter(Boolean).join(" ");
-
-// ── Credit cost helpers ────────────────────────────────────────────────────────
-// durationCredits: 1min→1, 2min→2, 3min→3
-// total = durationCredits × batchSize  (e.g. 2min × 3 = 6)
-export function calcCreditCost(duration: number, batchSize: number): number {
-  const durationCredits = duration === 120 ? 2 : duration === 180 ? 3 : 1;
-  return durationCredits * batchSize;
-}
 
 // ── Textarea ──────────────────────────────────────────────────────────────────
 interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -262,7 +254,7 @@ const LyricsModal: React.FC<LyricsModalProps> = ({
     if (open) setDraft(value);
   }, [open, value]);
 
-  if (!mounted || !open) return null;
+  if (!mounted) return null;
 
   return ReactDOM.createPortal(
     <AnimatePresence>

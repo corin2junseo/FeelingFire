@@ -608,4 +608,89 @@ vercel --prod
 
 ---
 
+## 코드리뷰 이력
+
+### 2026-03-13
+
+#### 수정 완료
+
+| 심각도 | 항목 | 파일 |
+|--------|------|------|
+| 🔴 Critical | **이중 환불 버그**: 동시 폴링 / 타임아웃 경쟁 시 크레딧 중복 환불 가능 | `poll/route.ts`, `refund/route.ts` |
+| 🔴 Critical | **TOCTOU 경합 조건**: Redis TTL 만료 타이밍에 따라 잔액 있어도 차감 실패 | `lib/credits.ts` |
+| 🟡 Medium | **개별 DB 인서트 → 배치 인서트**: batch_size N번 쿼리 → 단일 쿼리 | `generate/route.ts` |
+| 🟡 Medium | **`handleRename` `user_id` 필터 누락**: RLS 보호는 있지만 방어적 코딩 불일치 | `workspace/page.tsx` |
+| 🟡 Medium | **`refreshCredits` Redis 우회**: async Supabase sync 미완료 시 구크레딧 표시 | `AuthContext.tsx` |
+| 🟡 Medium | **`addToCache` 비원자적 GET→INCRBY**: 두 Redis 명령 사이에 상태 변경 가능 | `lib/credits.ts` |
+| 🟡 Medium | **`Replicate` 인스턴스 매 요청 생성**: 모듈 레벨로 이동해 재사용 | `generate/route.ts`, `poll/route.ts` |
+| 🟢 Minor | **`useEffect` 의존성 배열 누락**: ESLint 규칙 위반 | `AuthContext.tsx` |
+| 🟢 Minor | **인덴테이션 불일치**: 4스페이스 → 2스페이스 통일 | `webhooks/polar/route.ts` |
+| 🟢 Minor | **데드 코드 삭제**: 사용처 없는 단일 트랙 상태 조회 엔드포인트 제거 | `[id]/status/route.ts` |
+
+#### 주요 수정 상세
+
+**① 이중 환불 방지 (poll, refund)**
+
+`.in('status', ['pending', 'generating'])` 조건으로 업데이트하고, 실제 변경된 row가 있을 때만 환불 RPC 호출. 동시 요청에서 "first writer wins" 패턴으로 환불이 정확히 1회만 실행된다.
+
+```typescript
+// Before: 항상 환불 실행 → 동시 요청 시 이중 환불 가능
+await supabase.from('musics').update({ status: 'failed' }).eq('id', id)
+await admin.rpc('increment_user_credits', ...)
+
+// After: terminal 상태 아닌 row만 업데이트, 실제 변경 건수로 환불 여부 결정
+const updateResults = await Promise.all(
+  musicIds.map((id) =>
+    supabase.from('musics')
+      .update({ status: 'failed', error_message: errorMsg })
+      .eq('id', id).eq('user_id', user.id)
+      .in('status', ['pending', 'generating'])  // 멱등성 가드
+      .select('id')
+  )
+)
+const actuallyUpdated = updateResults.flatMap((r) => r.data ?? [])
+if (actuallyUpdated.length > 0) {
+  await admin.rpc('increment_user_credits', ...)
+}
+```
+
+**② TOCTOU 경합 조건 제거 (lib/credits.ts)**
+
+Redis Lua 스크립트로 GET → 잔액 확인 → DECRBY → EXPIRE를 단일 원자 연산으로 처리. 키 TTL 만료로 인한 false negative를 완전히 제거.
+
+```lua
+-- DEDUCT_SCRIPT: Redis 단일 스레드에서 중단 없이 실행
+local current = redis.call('GET', k)
+if current == false then return {0, 0} end  -- 캐시 미스 → Supabase 재로드 후 재시도
+local bal = tonumber(current)
+if bal < amount then return {1, bal} end    -- 잔액 부족
+local new_bal = redis.call('DECRBY', k, amount)
+redis.call('EXPIRE', k, ttl)
+return {2, new_bal}                         -- 성공
+```
+
+**③ Redis 기반 크레딧 조회 신설 (`GET /api/credits`)**
+
+`refreshCredits`가 Supabase 직접 쿼리 대신 `/api/credits`를 경유하도록 변경. `deductCredits`의 비동기 Supabase sync 완료 여부와 무관하게 Redis의 정확한 잔액을 표시.
+
+```
+Before: refreshCredits → Supabase (sync 미완료 시 구크레딧 반환 가능)
+After:  refreshCredits → /api/credits → Redis (항상 최신 잔액 반환)
+        └─ 네트워크 오류 시 Supabase 직접 조회로 폴백
+```
+
+#### 추가 개선 권고 (미적용)
+
+| 항목 | 설명 | 파일 |
+|------|------|------|
+| `handleDelete` `user_id` 필터 누락 | `handleRename`과 동일한 패턴. `.eq("user_id", user.id)` 추가 권장 | `workspace/page.tsx` |
+| Signed URL 만료 처리 없음 | 1년 만료 URL이 DB에 저장되지만 자동 갱신 메커니즘 없음. 만료 후 재생 불가 | `poll/route.ts` |
+| 폴링 요청 중복 누적 | fire-and-forget 폴링이 서버 응답 지연 시 인터벌(4s)마다 요청이 쌓임. 진행 중 요청 추적으로 dedup 필요 | `workspace/page.tsx` |
+| `handleDelete` 낙관적 업데이트 | DB 삭제 실패해도 UI에서 항목이 사라짐. 에러 체크 후 롤백 필요 | `workspace/page.tsx` |
+| `MusicPlayerContext` 오디오 에러 핸들러 없음 | `Audio.onerror` 리스너 없어 URL 오류 시 UI 피드백 없음 | `MusicPlayerContext.tsx` |
+| 가사(lyrics) 서버 길이 검증 없음 | 클라이언트에서만 제한. Replicate API 제한을 초과하는 가사가 서버에 그대로 전달 | `generate/route.ts` |
+| `/api/credits` rate limit 없음 | 현재 사용 패턴에서는 문제없지만, 클라이언트 폴링 로직 추가 시 Redis 비용 증가 가능 | `app/api/credits/route.ts` |
+
+---
+
 © 2026 Feelingfire. All rights reserved.

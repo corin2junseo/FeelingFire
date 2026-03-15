@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 
@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [credits, setCredits] = useState(0)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const fetchCredits = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -33,9 +33,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data) setCredits(data.credits ?? 0)
   }, [supabase])
 
+  /**
+   * Redis-first 크레딧 갱신.
+   * deductCredits의 async Supabase sync 완료 전에도 Redis 캐시에서 정확한 잔액을 읽는다.
+   */
   const refreshCredits = useCallback(async () => {
     if (!user) return
-    await fetchCredits(user.id)
+    try {
+      const res = await fetch('/api/credits')
+      if (res.ok) {
+        const { credits } = await res.json()
+        setCredits(credits)
+      }
+    } catch {
+      // 네트워크 오류 시 Supabase 직접 조회로 폴백
+      await fetchCredits(user.id)
+    }
   }, [user, fetchCredits])
 
   useEffect(() => {
@@ -59,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [supabase, fetchCredits])
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({

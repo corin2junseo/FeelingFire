@@ -15,6 +15,12 @@ export interface MinimalistHeroProps {
     overlayText: {
         part1: string;
         part2: string;
+        part3?: string;
+    };
+    langSwitch?: {
+        currentLang: "en" | "ko";
+        enHref: string;
+        koHref: string;
     };
     className?: string;
 }
@@ -43,6 +49,7 @@ export const MinimalistHero = ({
     imageAlt,
     mainText,
     overlayText,
+    langSwitch,
     className,
 }: MinimalistHeroProps) => {
     return (
@@ -80,18 +87,59 @@ export const MinimalistHero = ({
                     >
                         {ctaLabel}
                     </motion.a>
+                    {langSwitch && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.5, delay: 0.4 }}
+                            className="flex items-center gap-1 text-xs font-bold tracking-widest"
+                        >
+                            <a
+                                href={langSwitch.enHref}
+                                className={langSwitch.currentLang === "en" ? "text-foreground" : "text-foreground/30 hover:text-foreground/60 transition-colors"}
+                            >
+                                EN
+                            </a>
+                            <span className="text-foreground/20">/</span>
+                            <a
+                                href={langSwitch.koHref}
+                                className={langSwitch.currentLang === "ko" ? "text-foreground" : "text-foreground/30 hover:text-foreground/60 transition-colors"}
+                            >
+                                KO
+                            </a>
+                        </motion.div>
+                    )}
                 </div>
 
                 {/* Mobile CTA (replaces hamburger with direct action) */}
-                <motion.a
-                    href={ctaLink}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-bold tracking-widest text-foreground/80 transition-all hover:border-white/40 md:hidden"
-                >
-                    {ctaLabel}
-                </motion.a>
+                <div className="flex items-center gap-3 md:hidden">
+                    {langSwitch && (
+                        <div className="flex items-center gap-1 text-xs font-bold tracking-widest">
+                            <a
+                                href={langSwitch.enHref}
+                                className={langSwitch.currentLang === "en" ? "text-foreground" : "text-foreground/30"}
+                            >
+                                EN
+                            </a>
+                            <span className="text-foreground/20">/</span>
+                            <a
+                                href={langSwitch.koHref}
+                                className={langSwitch.currentLang === "ko" ? "text-foreground" : "text-foreground/30"}
+                            >
+                                KO
+                            </a>
+                        </div>
+                    )}
+                    <motion.a
+                        href={ctaLink}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-bold tracking-widest text-foreground/80 transition-all hover:border-white/40"
+                    >
+                        {ctaLabel}
+                    </motion.a>
+                </div>
             </header>
 
             {/* Main Content */}
@@ -111,6 +159,7 @@ export const MinimalistHero = ({
                         {overlayText.part1}
                         <br />
                         {overlayText.part2}
+                        {overlayText.part3 && <><br />{overlayText.part3}</>}
                     </h1>
                 </motion.div>
 

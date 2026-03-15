@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceNavbar } from "@/components/WorkspaceNavbar";
 import { PromptInputBox, type MusicOptions } from "@/components/PromptInputBox";
 import { MusicList } from "@/components/MusicList";
@@ -34,6 +34,7 @@ export default function WorkspacePage() {
   const [pollingItems, setPollingItems] = useState<PollingItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [creditModalOpen, setCreditModalOpen] = useState(false);
+  const supabase = useMemo(() => createClient(), []);
   const pollingItemsRef = useRef<PollingItem[]>([]);
   const pollingActiveRef = useRef(false);
   // Stable ref so Realtime callback can call refreshCredits without stale closure
@@ -62,7 +63,6 @@ export default function WorkspacePage() {
   // Load existing music history from Supabase
   useEffect(() => {
     if (!user) return;
-    const supabase = createClient();
     (async () => {
       try {
         const { data } = await supabase
@@ -80,7 +80,6 @@ export default function WorkspacePage() {
   // Supabase Realtime: DB UPDATE → 즉시 UI 반영 (폴링 응답 처리 불필요)
   useEffect(() => {
     if (!user) return;
-    const supabase = createClient();
 
     const channel = supabase
       .channel(`musics-${user.id}`)
@@ -285,20 +284,19 @@ export default function WorkspacePage() {
   };
 
   const handleRename = useCallback(async (id: string, newTitle: string) => {
-    const supabase = createClient();
     const { error } = await supabase
       .from("musics")
       .update({ title: newTitle })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user!.id);
     if (!error) {
       setMusics((prev) =>
         prev.map((m) => (m.id === id ? { ...m, title: newTitle } : m))
       );
     }
-  }, []);
+  }, [user]);
 
   const handleDelete = useCallback(async (id: string) => {
-    const supabase = createClient();
     await supabase.from("musics").delete().eq("id", id);
     setMusics((prev) => prev.filter((m) => m.id !== id));
     setPollingItems((prev) =>

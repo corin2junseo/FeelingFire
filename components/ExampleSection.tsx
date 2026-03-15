@@ -10,6 +10,14 @@ interface Track {
     label: string;
 }
 
+interface ExampleSectionContent {
+    sectionLabel?: string;
+    headingLine1?: string;
+    headingLine2?: string;
+    subheading?: string;
+    ctaText?: string;
+}
+
 const tracks: Track[] = [
     { id: 1, src: "/music/1.mp3", title: "Epic Journey", label: "MOOD · CINEMATIC" },
     { id: 2, src: "/music/2.mp3", title: "Chill Wave", label: "MOOD · AMBIENT" },
@@ -194,7 +202,13 @@ function MusicCard({
     );
 }
 
-export function ExampleSection() {
+export function ExampleSection({ content }: { content?: ExampleSectionContent } = {}) {
+    const sectionLabel = content?.sectionLabel ?? "EXAMPLE TRACKS";
+    const headingLine1 = content?.headingLine1 ?? "Perfect Music";
+    const headingLine2 = content?.headingLine2 ?? "For Your Videos";
+    const subheading = content?.subheading ?? "Create the perfect soundtrack for your content.\nAI generates tracks matched to your mood instantly.";
+    const ctaText = content?.ctaText ?? "Create Your Music →";
+
     const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
 
     return (
@@ -209,20 +223,18 @@ export function ExampleSection() {
                     className="mb-16 text-center"
                 >
                     <p className="mb-4 text-xs font-bold tracking-widest text-foreground/50">
-                        EXAMPLE TRACKS
+                        {sectionLabel}
                     </p>
                     <h2
                         className="text-5xl font-extrabold leading-tight text-foreground md:text-6xl lg:text-7xl"
                         style={{ fontFamily: "var(--font-pirata-one)" }}
                     >
-                        Perfect Music
+                        {headingLine1}
                         <br />
-                        For Your Videos
+                        {headingLine2}
                     </h2>
-                    <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-foreground/60">
-                        Create the perfect soundtrack for your content.
-                        <br />
-                        AI generates tracks matched to your mood instantly.
+                    <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-foreground/60 whitespace-pre-line">
+                        {subheading}
                     </p>
                 </motion.div>
 
@@ -251,7 +263,7 @@ export function ExampleSection() {
                         href="/auth"
                         className="inline-block rounded-full bg-white px-8 py-3.5 text-sm font-bold text-black transition-all hover:scale-105 hover:bg-white/90"
                     >
-                        Create Your Music →
+                        {ctaText}
                     </a>
                 </motion.div>
             </div>

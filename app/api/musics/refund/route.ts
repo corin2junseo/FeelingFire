@@ -34,19 +34,24 @@ export async function POST(req: NextRequest) {
     console.error('[refund] Failed to fetch credits_used:', recordError)
   }
 
-  // Mark all records as failed
-  await Promise.all(
+  // 멱등성 보장: 아직 terminal 상태가 아닌 레코드만 업데이트
+  // poll에서 이미 실패 처리된 경우, 타임아웃 refund가 이중 환불하지 않도록 방지
+  const updateResults = await Promise.all(
     musicIds.map((id) =>
       supabase
         .from('musics')
         .update({ status: 'failed', error_message: 'Generation timed out' })
         .eq('id', id)
         .eq('user_id', user.id)
+        .in('status', ['pending', 'generating'])
+        .select('id')
     )
   )
 
-  // Refund credits via RPC (atomic — no read-then-write race condition)
-  if (musicRecord?.credits_used && musicRecord.credits_used > 0) {
+  const actuallyUpdated = updateResults.flatMap((r) => r.data ?? [])
+
+  // 실제로 상태를 변경한 경우에만 환불 (이중 환불 방지)
+  if (actuallyUpdated.length > 0 && musicRecord?.credits_used && musicRecord.credits_used > 0) {
     const admin = createAdminClient()
     const { error: refundError } = await admin.rpc('increment_user_credits', {
       p_user_id: user.id,

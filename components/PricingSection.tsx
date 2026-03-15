@@ -3,7 +3,29 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const plans = [
+interface PricingPlan {
+    id: string;
+    name: string;
+    price: string;
+    credits: number;
+    perCredit: string;
+    badge: string | null;
+    description: string;
+    features: string[];
+}
+
+interface PricingSectionContent {
+    sectionLabel?: string;
+    headingLine1?: string;
+    headingLine2?: string;
+    subheading?: string;
+    creditPill?: string;
+    ctaText?: string;
+    bottomNote?: string;
+    plans?: PricingPlan[];
+}
+
+const defaultPlans: PricingPlan[] = [
     {
         id: "pro",
         name: "Pro",
@@ -26,7 +48,16 @@ const plans = [
     },
 ];
 
-export function PricingSection() {
+export function PricingSection({ content }: { content?: PricingSectionContent } = {}) {
+    const sectionLabel = content?.sectionLabel ?? "PRICING";
+    const headingLine1 = content?.headingLine1 ?? "Pay Only For";
+    const headingLine2 = content?.headingLine2 ?? "What You Use";
+    const subheading = content?.subheading ?? "No subscription, no commitment. Top up credits\nand generate music whenever you need it.";
+    const creditPill = content?.creditPill ?? "1 CREDIT = 1 TRACK GENERATED";
+    const ctaText = content?.ctaText ?? "Get Started →";
+    const bottomNote = content?.bottomNote ?? "Credits never expire. One-time payment, no subscription.";
+    const plans = content?.plans ?? defaultPlans;
+
     return (
         <section
             id="pricing"
@@ -42,20 +73,18 @@ export function PricingSection() {
                     className="mb-6 text-center"
                 >
                     <p className="mb-4 text-xs font-bold tracking-widest text-foreground/50">
-                        PRICING
+                        {sectionLabel}
                     </p>
                     <h2
                         className="text-5xl font-extrabold leading-tight text-foreground md:text-6xl lg:text-7xl"
                         style={{ fontFamily: "var(--font-pirata-one)" }}
                     >
-                        Pay Only For
+                        {headingLine1}
                         <br />
-                        What You Use
+                        {headingLine2}
                     </h2>
-                    <p className="mx-auto mt-5 max-w-sm text-sm leading-relaxed text-foreground/60">
-                        No subscription, no commitment. Top up credits
-                        <br />
-                        and generate music whenever you need it.
+                    <p className="mx-auto mt-5 max-w-sm text-sm leading-relaxed text-foreground/60 whitespace-pre-line">
+                        {subheading}
                     </p>
                 </motion.div>
 
@@ -69,7 +98,7 @@ export function PricingSection() {
                 >
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-1.5 text-xs font-bold tracking-widest text-foreground/70">
                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-foreground/60" />
-                        1 CREDIT = 1 TRACK GENERATED
+                        {creditPill}
                     </div>
                 </motion.div>
 
@@ -167,7 +196,7 @@ export function PricingSection() {
                                     href="/auth"
                                     className="mt-8 w-full rounded-full bg-white py-3 text-xs font-bold tracking-widest text-black transition-all hover:scale-105 hover:bg-white/90"
                                 >
-                                    Get Started →
+                                    {ctaText}
                                 </a>
                             </div>
                         </motion.div>
@@ -182,7 +211,7 @@ export function PricingSection() {
                     transition={{ duration: 0.6, delay: 0.4 }}
                     className="mt-10 text-center text-xs text-foreground/30"
                 >
-                    Credits never expire. One-time payment, no subscription.
+                    {bottomNote}
                 </motion.p>
             </div>
         </section>

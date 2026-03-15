@@ -5,6 +5,8 @@ import { addToCache } from '@/lib/credits'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
 
+const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
+
 const SIGNED_URL_EXPIRES = 60 * 60 * 24 * 365 // 1 year
 const CACHE_TTL_SECONDS = 3
 const TERMINAL_STATUSES = ['succeeded', 'failed', 'canceled']
@@ -33,8 +35,6 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
-  const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
   try {
     // 캐시 HIT: 처리 중 상태면 Replicate API 호출 스킵
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
     if (prediction.status === 'failed' || prediction.status === 'canceled') {
       const errorMsg = prediction.error ? String(prediction.error) : 'Generation failed'
 
-      // Fetch credits_used from first music record (total for the batch)
+      // Fetch credits_used before updating (batch 전체 비용은 첫 번째 레코드에 저장)
       const { data: musicRecord, error: recordError } = await supabase
         .from('musics')
         .select('credits_used')
@@ -126,18 +126,24 @@ export async function GET(request: NextRequest) {
         console.error('[poll] Failed to fetch credits_used:', recordError)
       }
 
-      await Promise.all(
+      // 멱등성 보장: 아직 terminal 상태가 아닌 레코드만 업데이트
+      // 동시 요청이 들어와도 실제로 상태를 바꾼 첫 번째 호출만 환불 처리
+      const updateResults = await Promise.all(
         musicIds.map((id) =>
           supabase
             .from('musics')
             .update({ status: 'failed', error_message: errorMsg })
             .eq('id', id)
             .eq('user_id', user.id)
+            .in('status', ['pending', 'generating'])
+            .select('id')
         )
       )
 
-      // Refund credits via RPC (atomic — no read-then-write race condition)
-      if (musicRecord?.credits_used && musicRecord.credits_used > 0) {
+      const actuallyUpdated = updateResults.flatMap((r) => r.data ?? [])
+
+      // 실제로 상태를 변경한 경우에만 환불 (이중 환불 방지)
+      if (actuallyUpdated.length > 0 && musicRecord?.credits_used && musicRecord.credits_used > 0) {
         const admin = createAdminClient()
         const { error: refundError } = await admin.rpc('increment_user_credits', {
           p_user_id: user.id,

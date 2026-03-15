@@ -35,6 +35,11 @@ export function MusicCard({ music, onRename, onDelete }: MusicCardProps) {
   const isActive = currentTrack?.id === music.id;
   const isThisPlaying = isActive && isPlaying;
 
+  const waveformHeights = React.useMemo(
+    () => Array.from({ length: 40 }, () => 20 + Math.random() * 80),
+    []
+  );
+
   // Close menu on outside click
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -228,12 +233,12 @@ export function MusicCard({ music, onRename, onDelete }: MusicCardProps) {
       {/* Generating skeleton bars */}
       {music.status === "generating" && (
         <div className="flex items-end gap-0.5 h-8 px-1">
-          {[...Array(40)].map((_, i) => (
+          {waveformHeights.map((h, i) => (
             <div
               key={i}
               className="flex-1 rounded-full bg-[#9b87f5]/30 animate-pulse"
               style={{
-                height: `${20 + Math.random() * 80}%`,
+                height: `${h}%`,
                 animationDelay: `${(i * 0.06) % 1}s`,
                 animationDuration: `${0.8 + (i % 4) * 0.2}s`,
               }}

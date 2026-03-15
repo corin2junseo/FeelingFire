@@ -6,7 +6,21 @@ import dynamic from "next/dynamic";
 
 const Silk = dynamic(() => import("@/components/Silk"), { ssr: false });
 
-export function CTASection() {
+interface CTASectionContent {
+    sectionLabel?: string;
+    headingLine1?: string;
+    headingLine2?: string;
+    subheading?: string;
+    ctaText?: string;
+}
+
+export function CTASection({ content }: { content?: CTASectionContent } = {}) {
+    const sectionLabel = content?.sectionLabel ?? "GET STARTED";
+    const headingLine1 = content?.headingLine1 ?? "Start Creating";
+    const headingLine2 = content?.headingLine2 ?? "Your Music";
+    const subheading = content?.subheading ?? "No subscription, no commitment. Top up credits and\ngenerate YouTube-ready music in seconds.";
+    const ctaText = content?.ctaText ?? "Start for Free →";
+
     return (
         <section className="relative w-full overflow-hidden" style={{ minHeight: "480px" }}>
             {/* Silk shader — full-bleed background */}
@@ -40,7 +54,7 @@ export function CTASection() {
                     transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                     className="mb-4 text-xs font-bold tracking-widest text-foreground/50"
                 >
-                    GET STARTED
+                    {sectionLabel}
                 </motion.p>
 
                 <motion.h2
@@ -51,9 +65,9 @@ export function CTASection() {
                     className="text-5xl font-extrabold leading-tight text-foreground md:text-6xl lg:text-7xl"
                     style={{ fontFamily: "var(--font-pirata-one)" }}
                 >
-                    Start Creating
+                    {headingLine1}
                     <br />
-                    Your Music
+                    {headingLine2}
                 </motion.h2>
 
                 <motion.p
@@ -61,11 +75,9 @@ export function CTASection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                    className="mx-auto mt-5 max-w-sm text-sm leading-relaxed text-foreground/60"
+                    className="mx-auto mt-5 max-w-sm text-sm leading-relaxed text-foreground/60 whitespace-pre-line"
                 >
-                    No subscription, no commitment. Top up credits and
-                    <br />
-                    generate YouTube-ready music in seconds.
+                    {subheading}
                 </motion.p>
 
                 <motion.a
@@ -77,7 +89,7 @@ export function CTASection() {
                     whileHover={{ scale: 1.05 }}
                     className="mt-10 inline-block rounded-full bg-white px-10 py-4 text-sm font-bold tracking-widest text-black transition-opacity hover:bg-white/90"
                 >
-                    Start for Free →
+                    {ctaText}
                 </motion.a>
             </div>
         </section>

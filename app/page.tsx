@@ -27,6 +27,11 @@ export default function Home() {
                     part1: "Create",
                     part2: "Your Music",
                 }}
+                langSwitch={{
+                    currentLang: "en",
+                    enHref: "/",
+                    koHref: "/ko",
+                }}
             />
             <FeaturesSection />
             <ExampleSection />
