@@ -81,20 +81,20 @@ export async function deductCredits(
     await loadFromSupabase(userId)
   }
 
-  const [code, balance] = await redis.eval<[number, number]>(
+  const [code, balance] = (await redis.eval(
     DEDUCT_SCRIPT,
     [k],
     [String(amount), String(CREDITS_TTL)]
-  )
+  )) as [number, number]
 
   // 키가 warmup과 eval 사이에 만료된 경우 — 재로드 후 1회 재시도
   if (code === 0) {
     await loadFromSupabase(userId)
-    const [code2, balance2] = await redis.eval<[number, number]>(
+    const [code2, balance2] = (await redis.eval(
       DEDUCT_SCRIPT,
       [k],
       [String(amount), String(CREDITS_TTL)]
-    )
+    )) as [number, number]
     if (code2 !== 2) {
       return { ok: false, remaining: balance2 }
     }
@@ -126,5 +126,5 @@ return 0
 `
 
 export async function addToCache(userId: string, amount: number): Promise<void> {
-  await redis.eval<number>(ADD_TO_CACHE_SCRIPT, [key(userId)], [String(amount)])
+  await redis.eval(ADD_TO_CACHE_SCRIPT, [key(userId)], [String(amount)])
 }
