@@ -1,11 +1,11 @@
 "use client";
 
-import { MinimalistHero } from "@/components/MinimalistHero";
-import { FeaturesSection } from "@/components/FeaturesSection";
-import { ExampleSection } from "@/components/ExampleSection";
-import { PricingSection } from "@/components/PricingSection";
-import { CTASection } from "@/components/CTASection";
-import { Footer } from "@/components/Footer";
+import { MinimalistHero } from "@/components/marketing/MinimalistHero";
+import { FeaturesSection } from "@/components/marketing/FeaturesSection";
+import { ExampleSection } from "@/components/marketing/ExampleSection";
+import { PricingSection } from "@/components/marketing/PricingSection";
+import { CTASection } from "@/components/marketing/CTASection";
+import { Footer } from "@/components/layout/Footer";
 
 export default function Home() {
     const navLinks = [

@@ -7,7 +7,7 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import type { Music } from "@/lib/types/musics";
+import type { Music } from "@/types/music";
 
 interface MusicPlayerContextType {
   playlist: Music[];

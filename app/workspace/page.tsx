@@ -2,16 +2,19 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { WorkspaceNavbar } from "@/components/WorkspaceNavbar";
-import { PromptInputBox, type MusicOptions } from "@/components/PromptInputBox";
-import { MusicList } from "@/components/MusicList";
-import { MusicPlayer } from "@/components/MusicPlayer";
-import { GenerationStatus } from "@/components/GenerationStatus";
-import { CreditModal } from "@/components/CreditModal";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WorkspaceNavbar } from "@/components/layout/WorkspaceNavbar";
+import { PromptInputBox, type MusicOptions } from "@/components/music/PromptInputBox";
+import { MusicList } from "@/components/music/MusicList";
+import { MusicPlayer } from "@/components/music/MusicPlayer";
+import { GenerationStatus } from "@/components/music/GenerationStatus";
+import { CreditModal } from "@/components/credits/CreditModal";
+import { AlbumCoverModal } from "@/components/music/AlbumCoverModal";
+import { MusicDetailModal } from "@/components/music/MusicDetailModal";
 import { createClient } from "@/lib/supabase/client";
-import type { Music } from "@/lib/types/musics";
+import type { RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
+import type { Music } from "@/types/music";
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLL_ATTEMPTS = 75; // 75 × 4s = 5 minutes
@@ -22,10 +25,11 @@ interface PollingItem {
   attempts: number;
 }
 
-export default function WorkspacePage() {
+function WorkspacePageContent() {
   const { user, loading, credits, refreshCredits } = useAuth();
   const { setPlaylist } = useMusicPlayer();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [musics, setMusics] = useState<Music[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -34,6 +38,8 @@ export default function WorkspacePage() {
   const [pollingItems, setPollingItems] = useState<PollingItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [creditModalOpen, setCreditModalOpen] = useState(false);
+  const [coverModal, setCoverModal] = useState<{ musicId: string; musicPrompt: string } | null>(null);
+  const [detailMusic, setDetailMusic] = useState<Music | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const pollingItemsRef = useRef<PollingItem[]>([]);
   const pollingActiveRef = useRef(false);
@@ -55,6 +61,14 @@ export default function WorkspacePage() {
     }
   }, [user, loading, router]);
 
+  // 결제 완료 후 복귀 시 크레딧 강제 갱신 (웹훅 처리 대기)
+  useEffect(() => {
+    if (!user || searchParams.get("payment") !== "success") return;
+    const t1 = setTimeout(() => refreshCredits(), 1500);
+    const t2 = setTimeout(() => refreshCredits(), 4000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [user, searchParams]);
+
   // Sync completed musics to player playlist
   useEffect(() => {
     setPlaylist(musics);
@@ -67,7 +81,7 @@ export default function WorkspacePage() {
       try {
         const { data } = await supabase
           .from("musics")
-          .select("id, user_id, prompt, title, mood, genre, duration, file_path, file_url, status, error_message, created_at, updated_at")
+          .select("id, user_id, prompt, title, mood, genre, duration, file_path, file_url, cover_image_url, lyrics, status, error_message, created_at, updated_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
         if (data) setMusics(data as Music[]);
@@ -91,8 +105,8 @@ export default function WorkspacePage() {
           table: "musics",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          const updated = payload.new as Music;
+        (payload: RealtimePostgresUpdatePayload<Music>) => {
+          const updated = payload.new;
 
           // DB row 전체로 로컬 상태 갱신 (file_url 포함)
           setMusics((prev) =>
@@ -144,7 +158,7 @@ export default function WorkspacePage() {
           const musicIdsParam = item.musicIds.join(",");
           fetch(
             `/api/musics/poll?predictionId=${item.predictionId}&musicIds=${musicIdsParam}`
-          ).catch(() => {});
+          ).catch(() => { });
         }
       }
 
@@ -155,7 +169,7 @@ export default function WorkspacePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ musicIds: timedOutIds }),
-        }).catch(() => {});
+        }).catch(() => { });
         setMusics((prev) =>
           prev.map((m) =>
             timedOutIds.includes(m.id)
@@ -172,7 +186,7 @@ export default function WorkspacePage() {
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSend = async (caption: string, options: MusicOptions) => {
@@ -198,6 +212,8 @@ export default function WorkspacePage() {
       duration: null,
       file_path: null,
       file_url: null,
+      cover_image_url: null,
+      lyrics: null,
       status: "generating",
       error_message: null,
       created_at: now,
@@ -216,7 +232,12 @@ export default function WorkspacePage() {
           batch_size: batchSize,
         }),
       });
-      const data = await res.json();
+      let data: Record<string, unknown> = {};
+      try {
+        data = await res.json();
+      } catch {
+        // empty or non-JSON response (e.g. server crash, missing env vars)
+      }
 
       if (!res.ok) {
         if (res.status === 402) {
@@ -229,10 +250,10 @@ export default function WorkspacePage() {
             prev.map((m) =>
               tempIds.includes(m.id)
                 ? {
-                    ...m,
-                    status: "failed",
-                    error_message: data.error ?? "Generation failed",
-                  }
+                  ...m,
+                  status: "failed",
+                  error_message: (data.error as string) ?? "Generation failed",
+                }
                 : m
             )
           );
@@ -296,6 +317,20 @@ export default function WorkspacePage() {
     }
   }, [user]);
 
+  const handleOpenDetail = useCallback((music: Music) => {
+    setDetailMusic(music);
+  }, []);
+
+  const handleGenerateCover = useCallback((musicId: string, musicPrompt: string) => {
+    setCoverModal({ musicId, musicPrompt });
+  }, []);
+
+  const handleApplyCover = useCallback((musicId: string, coverUrl: string) => {
+    setMusics((prev) =>
+      prev.map((m) => (m.id === musicId ? { ...m, cover_image_url: coverUrl } : m))
+    );
+  }, []);
+
   const handleDelete = useCallback(async (id: string) => {
     await supabase.from("musics").delete().eq("id", id);
     setMusics((prev) => prev.filter((m) => m.id !== id));
@@ -329,15 +364,17 @@ export default function WorkspacePage() {
           musics={
             searchQuery.trim()
               ? musics.filter((m) =>
-                  (m.title ?? m.prompt)
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase())
-                )
+                (m.title ?? m.prompt)
+                  .toLowerCase()
+                  .includes(searchQuery.toLowerCase())
+              )
               : musics
           }
           isLoading={isLoadingHistory}
           onRename={handleRename}
           onDelete={handleDelete}
+          onGenerateCover={handleGenerateCover}
+          onOpenDetail={handleOpenDetail}
           searchQuery={searchQuery}
         />
       </main>
@@ -364,11 +401,47 @@ export default function WorkspacePage() {
         </div>
 
         {/* Music player — slides in right below prompt when a track is active */}
-        <MusicPlayer />
+        <MusicPlayer onOpenDetail={handleOpenDetail} />
       </div>
+
+      {/* Music detail modal */}
+      {detailMusic && (
+        <MusicDetailModal
+          music={detailMusic}
+          onClose={() => setDetailMusic(null)}
+        />
+      )}
 
       {/* Credit modal — opens on insufficient credits */}
       <CreditModal open={creditModalOpen} onClose={() => setCreditModalOpen(false)} />
+
+      {/* Album cover modal */}
+      {coverModal && (
+        <AlbumCoverModal
+          open={true}
+          musicId={coverModal.musicId}
+          musicPrompt={coverModal.musicPrompt}
+          userCredits={credits}
+          onClose={() => setCoverModal(null)}
+          onApply={handleApplyCover}
+          onInsufficientCredits={() => {
+            setCoverModal(null);
+            setCreditModalOpen(true);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+export default function WorkspacePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-[#171717]">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+      </div>
+    }>
+      <WorkspacePageContent />
+    </Suspense>
   );
 }

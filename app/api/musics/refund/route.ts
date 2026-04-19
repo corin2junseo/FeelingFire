@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { addToCache } from '@/lib/credits'
+import { addToCache } from '@/services/credits'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**

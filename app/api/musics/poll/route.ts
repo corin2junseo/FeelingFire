@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redis } from '@/lib/redis'
-import { addToCache } from '@/lib/credits'
+import { addToCache } from '@/services/credits'
+import { getCachedUser } from '@/services/auth'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
   const musicIds = musicIdsParam.split(',').filter(Boolean)
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser(supabase)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

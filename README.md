@@ -58,9 +58,10 @@
 
 ```
 feelingfire/
-├── app/
+├── app/                                # [라우팅 레이어] Next.js App Router — 최대한 얇게 유지
 │   ├── layout.tsx                      # 루트 레이아웃: AuthProvider, MusicPlayerProvider
-│   ├── page.tsx                        # 랜딩 페이지 (히어로, 기능, 가격, CTA)
+│   ├── page.tsx                        # 랜딩 페이지 (EN)
+│   ├── ko/page.tsx                     # 랜딩 페이지 (KO)
 │   ├── workspace/
 │   │   └── page.tsx                    # 메인 워크스페이스 (음악 생성 + 목록)
 │   ├── auth/
@@ -70,51 +71,68 @@ feelingfire/
 │   ├── terms/page.tsx                  # 이용약관
 │   └── api/
 │       ├── checkout/route.ts          # POST: Polar.sh 체크아웃 세션 (Edge Runtime ⚡)
+│       ├── credits/route.ts           # GET: Redis-first 크레딧 잔액 조회
 │       ├── musics/
 │       │   ├── generate/route.ts      # POST: 음악 생성 (Rate limit → Credits → Replicate)
 │       │   ├── poll/route.ts          # GET: 생성 상태 폴링 (Redis 캐시 → Replicate)
-│       │   ├── refund/route.ts        # POST: 타임아웃 환불 처리
-│       │   └── [id]/status/route.ts   # GET: 개별 음악 상태 조회
+│       │   └── refund/route.ts        # POST: 타임아웃 환불 처리
 │       ├── webhooks/
 │       │   └── polar/route.ts         # POST: 결제 완료 웹훅 → 크레딧 지급
 │       └── dev/
 │           └── benchmark/route.ts     # GET: Redis vs Supabase 레이턴시 벤치마크 (dev only)
 │
-├── components/
-│   ├── — 랜딩 페이지 —
-│   ├── MinimalistHero.tsx              # 히어로 섹션 (로고, 네비, 3D 배경)
-│   ├── FeaturesSection.tsx             # 기능 소개 카드 그리드
-│   ├── ExampleSection.tsx              # 예시 쇼케이스
-│   ├── PricingSection.tsx              # Pro / Ultra 요금제 카드
-│   ├── CTASection.tsx                  # 하단 CTA
-│   ├── Footer.tsx                      # 푸터
-│   ├── Silk.tsx                        # React Three Fiber 3D 실크 애니메이션
-│   ├── — 워크스페이스 —
-│   ├── WorkspaceNavbar.tsx             # 상단 바: 검색, 크레딧 표시, 유저 메뉴
-│   ├── PromptInputBox.tsx              # 음악 생성 입력창 (프롬프트, 가사, 길이, 수량)
-│   ├── MusicList.tsx                   # 음악 카드 그리드 + 빈 상태 처리
-│   ├── MusicCard.tsx                   # 개별 음악 카드 (재생, 다운로드, 이름 변경, 삭제)
-│   ├── MusicPlayer.tsx                 # 하단 고정 글로벌 뮤직 플레이어
-│   ├── GenerationStatus.tsx            # 생성 중 로딩 / 오류 인디케이터
-│   └── CreditModal.tsx                 # 크레딧 구매 모달
+├── components/                         # [UI 레이어] 도메인별 그룹화
+│   ├── ui/                             # 범용 프리미티브 (Button, Modal 등 — 확장 예정)
+│   │
+│   ├── layout/                         # 페이지 뼈대를 이루는 레이아웃 컴포넌트
+│   │   ├── WorkspaceNavbar.tsx         # 상단 바: 검색, 크레딧 표시, 유저 메뉴
+│   │   └── Footer.tsx                  # 푸터 (소셜 링크, 네비, 브랜드)
+│   │
+│   ├── marketing/                      # 랜딩페이지 전용 컴포넌트 (워크스페이스와 무관)
+│   │   ├── MinimalistHero.tsx          # 히어로 섹션 (로고, 네비, 이미지)
+│   │   ├── FeaturesSection.tsx         # 기능 소개 카드 그리드
+│   │   ├── ExampleSection.tsx          # 예시 트랙 쇼케이스 (인-브라우저 재생)
+│   │   ├── PricingSection.tsx          # Pro / Ultra 요금제 카드
+│   │   ├── CTASection.tsx              # 하단 CTA 섹션
+│   │   └── Silk.tsx                    # React Three Fiber 3D 실크 배경 애니메이션
+│   │
+│   ├── music/                          # 음악 도메인 UI (생성·재생·목록)
+│   │   ├── MusicCard.tsx               # 개별 음악 카드 (재생, 다운로드, 이름 변경, 삭제)
+│   │   ├── MusicList.tsx               # 음악 카드 목록 + 빈 상태 처리
+│   │   ├── MusicPlayer.tsx             # 하단 고정 글로벌 뮤직 플레이어
+│   │   ├── PromptInputBox.tsx          # 음악 생성 입력창 (프롬프트, 가사, 길이, 수량)
+│   │   └── GenerationStatus.tsx        # 생성 중 로딩 / 오류 인디케이터
+│   │
+│   └── credits/                        # 크레딧·결제 관련 UI
+│       └── CreditModal.tsx             # 크레딧 구매 모달 (Pro / Ultra 선택)
 │
-├── contexts/
-│   ├── AuthContext.tsx                 # 전역 인증 상태 + useAuth hook
-│   └── MusicPlayerContext.tsx          # 전역 플레이어 상태 + useMusicPlayer hook
+├── contexts/                           # [전역 상태] React Context Provider
+│   ├── AuthContext.tsx                 # 인증 상태 + useAuth hook (user, credits, signIn…)
+│   └── MusicPlayerContext.tsx          # 플레이어 상태 + useMusicPlayer hook
 │
-├── lib/
-│   ├── redis.ts                        # Upstash Redis 클라이언트 + generateRatelimit
-│   ├── credits.ts                      # getUserCredits · deductCredits · addToCache
+├── services/                           # [비즈니스 서비스 레이어] 도메인 로직 — lib와 분리
+│   ├── credits.ts                      # getUserCredits · deductCredits · addToCache (Redis + Supabase)
+│   ├── auth.ts                         # getCachedUser — JWT 서명 기반 Redis 인증 캐시
+│   └── pricing.ts                      # calcCreditCost — 길이 × 배리에이션 비용 계산
+│
+├── lib/                                # [인프라 레이어] 외부 서비스 클라이언트만
 │   ├── supabase/
 │   │   ├── client.ts                   # 브라우저 Supabase 클라이언트
 │   │   ├── server.ts                   # 서버 Supabase 클라이언트 (SSR + 쿠키)
 │   │   ├── admin.ts                    # 관리자 Supabase 클라이언트 (service role)
 │   │   └── edge.ts                     # Edge Runtime 전용 Supabase 클라이언트
-│   ├── types/
-│   │   └── musics.ts                   # Music, MusicInsert, MusicUpdate, MusicStatus 타입
+│   ├── redis.ts                        # Upstash Redis 클라이언트 + generateRatelimit
 │   └── utils.ts                        # cn() — clsx + tailwind-merge 유틸리티
 │
+├── types/                              # [타입 정의] 루트 레벨 전역 타입
+│   └── music.ts                        # Music, MusicStatus, MusicInsert, MusicUpdate
+│
+├── hooks/                              # [재사용 훅] 커스텀 훅 확장 예정
+│
 ├── tests/
+│   ├── smoke-test.js
+│   ├── load-test.js
+│   ├── stress-test.js
 │   └── perf/
 │       ├── latency-benchmark.js        # k6 레이턴시 벤치마크 시나리오
 │       ├── compare-report.mjs          # Before/After 성능 비교 리포트 생성기
@@ -122,6 +140,93 @@ feelingfire/
 │
 └── middleware.ts                        # 세션 자동 갱신 (/workspace/*, /api/* 에서만 실행)
 ```
+
+---
+
+## 폴더 구조 설계 원칙
+
+### 핵심 기준: 관심사의 분리 (Separation of Concerns)
+
+코드를 어디에 두어야 하는지 판단할 때 **"이 코드는 무엇을 책임지는가"** 라는 단 하나의 질문을 기준으로 삼았습니다.
+
+---
+
+### 1. `app/` — 라우팅만 담당, 비즈니스 로직 최소화
+
+Next.js App Router는 **파일 경로 = URL 경로**라는 강한 제약을 갖습니다.
+`app/` 디렉토리는 "어떤 URL에서 무엇을 렌더링할지"만 결정하고,
+실제 로직은 `services/`, `components/`, `contexts/`에 위임합니다.
+
+이렇게 하면 `app/` 안의 파일이 얇아져, 라우팅 변경이 비즈니스 로직에 영향을 주지 않습니다.
+
+---
+
+### 2. `components/` — 도메인별 그룹화 (기능 분리)
+
+리팩토링 전 `components/`는 14개 파일이 하나의 평탄한 목록으로 나열되어 있었습니다.
+`MinimalistHero.tsx`(랜딩 전용)와 `MusicPlayer.tsx`(워크스페이스 전용)가 같은 레벨에 있어,
+어느 컴포넌트가 어느 페이지에 속하는지 파일명 없이는 알 수 없었습니다.
+
+**분리 기준:**
+
+| 폴더 | 기준 | 이유 |
+|------|------|------|
+| `marketing/` | 랜딩페이지에서만 사용 | 워크스페이스 개발 시 이 폴더를 건드릴 이유가 없음 |
+| `layout/` | 페이지 구조를 구성 (Navbar, Footer) | UI 컴포넌트이지만 도메인 로직이 아닌 레이아웃 책임 |
+| `music/` | 음악 생성·재생 도메인 | 핵심 비즈니스 도메인을 반영한 명확한 그룹 |
+| `credits/` | 결제·크레딧 도메인 | 음악과 다른 관심사 — 나중에 결제 흐름이 복잡해져도 격리됨 |
+| `ui/` | 도메인 무관 프리미티브 | Button, Modal 등 재사용 컴포넌트를 추가할 준비된 공간 |
+
+`Silk.tsx`는 `CTASection.tsx`에서만 사용하는 시각 효과이므로
+`marketing/`에 함께 배치해 상호 의존성을 폴더 안에 완결시켰습니다.
+
+---
+
+### 3. `services/` vs `lib/` — 비즈니스 로직과 인프라의 분리
+
+리팩토링 전 `lib/`에는 두 종류의 코드가 섞여 있었습니다.
+
+```
+lib/
+  redis.ts        ← 외부 서비스 클라이언트 (인프라)
+  supabase/       ← 외부 서비스 클라이언트 (인프라)
+  credits.ts      ← 크레딧 차감 로직 (비즈니스) ← 여기 있으면 안 됨
+  auth-cache.ts   ← 인증 캐싱 전략 (비즈니스)   ← 여기 있으면 안 됨
+  pricing.ts      ← 가격 계산 규칙 (비즈니스)    ← 여기 있으면 안 됨
+```
+
+**`lib/`은 순수 인프라입니다.** Supabase 클라이언트, Redis 연결처럼
+외부 서비스에 접속하는 방법만 알고 있어야 합니다.
+"몇 크레딧을 어떻게 차감할지"는 비즈니스 규칙이고, 이것은 `services/`에 속합니다.
+
+이 분리 덕분에:
+- Upstash를 다른 Redis로 교체하면 `lib/redis.ts`만 수정하면 됩니다.
+- 크레딧 차감 정책이 바뀌면 `services/credits.ts`만 수정하면 됩니다.
+- 두 관심사가 서로를 모릅니다.
+
+---
+
+### 4. `types/` — 루트 레벨 승격
+
+리팩토링 전 타입은 `lib/types/musics.ts`에 있었습니다.
+타입 정의는 인프라도, 서비스도, UI도 아닙니다. **프로젝트 전체가 공유하는 계약**입니다.
+
+`lib/` 안에 넣으면 "이 타입은 인프라 계층에 속한다"는 잘못된 신호를 줍니다.
+루트의 `types/music.ts`로 승격함으로써 어느 계층에서든 동등하게 import할 수 있습니다.
+
+또한 `index.ts`를 통한 re-export(배럴 파일)는 추가하지 않았습니다.
+Next.js App Router에서 배럴 파일은 트리 쉐이킹을 방해해 불필요한 번들 크기를 유발합니다.
+직접 `import type { Music } from '@/types/music'`으로 참조하는 것이 더 명확하고 안전합니다.
+
+---
+
+### 5. 보류한 변경: `app/(marketing)/` Route Group
+
+Next.js의 Route Group은 **그룹 전용 `layout.tsx`가 필요할 때** 의미가 있습니다.
+현재 랜딩 페이지들은 모두 루트 `layout.tsx`를 그대로 공유하므로,
+`(marketing)/` 폴더를 만들어도 기능 차이가 없고 import 경로만 길어집니다.
+마케팅 페이지가 독립적인 레이아웃(다른 폰트, 다른 메타데이터 전략 등)을 갖게 되면
+그때 도입하는 것이 적절합니다.
 
 ---
 

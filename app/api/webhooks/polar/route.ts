@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { addToCache } from '@/lib/credits'
+import { addToCache } from '@/services/credits'
 
 const CREDITS_MAP: Record<string, number> = {
   [process.env.POLAR_PRO_PRODUCT_ID!]: 30,
@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Supabase RPC 성공 후 Redis 캐시 동기화
+    //웹훅 수신 후 addToCache — Redis 즉시 갱신	
     await addToCache(userId, credits)
   }
 

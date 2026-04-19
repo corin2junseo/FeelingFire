@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Polar } from "@polar-sh/sdk";
 import { createEdgeClient } from "@/lib/supabase/edge";
+import { getCachedUser } from "@/services/auth";
 
 export const runtime = "edge";
 
@@ -16,9 +17,7 @@ const PRODUCT_IDS: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
     const supabase = createEdgeClient(req);
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCachedUser(supabase);
 
     if (!user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest) {
         req.headers.get("origin") ??
         process.env.PUBLIC_APP_URL?.replace(/\/$/, "") ??
         "";
-
+    //결제 성공 후 /workspace?payment=success로 리다이렉트 설정	
     try {
         const checkout = await polar.checkouts.create({
             products: [productId],

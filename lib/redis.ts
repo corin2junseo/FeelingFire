@@ -9,3 +9,10 @@ export const generateRatelimit = new Ratelimit({
   limiter: Ratelimit.slidingWindow(10, '1 m'),
   prefix: 'ratelimit:generate',
 })
+
+// 유저당 분당 20회 커버 생성 제한
+export const coverRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, '1 m'),
+  prefix: 'ratelimit:cover',
+})

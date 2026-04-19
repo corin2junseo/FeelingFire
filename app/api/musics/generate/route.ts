@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateRatelimit } from '@/lib/redis'
-import { deductCredits, addToCache } from '@/lib/credits'
-import { calcCreditCost } from '@/lib/pricing'
+import { deductCredits, addToCache } from '@/services/credits'
+import { getCachedUser } from '@/services/auth'
+import { calcCreditCost } from '@/services/pricing'
 import Replicate from 'replicate'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -11,7 +12,7 @@ const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser(supabase)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
       Array.from({ length: batchSize }, () => ({
         user_id: user.id,
         prompt: caption,
+        lyrics: lyricsText || null,
         status: 'generating',
         credits_used: creditCost,
       }))

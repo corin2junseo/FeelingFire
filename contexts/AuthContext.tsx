@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
-import { Session, User } from '@supabase/supabase-js'
+import { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 
 interface AuthContextType {
@@ -52,18 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchCredits])
 
   useEffect(() => {
-    // 초기 세션 로드
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) fetchCredits(session.user.id)
-      setLoading(false)
-    })
-
-    // 로그인/로그아웃 상태 변화 감지
+    // INITIAL_SESSION 이벤트로 초기 세션 처리 (getSession() 별도 호출 시 동시 토큰 갱신 충돌 발생)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) fetchCredits(session.user.id)
