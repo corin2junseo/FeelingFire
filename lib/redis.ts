@@ -16,3 +16,9 @@ export const coverRatelimit = new Ratelimit({
   limiter: Ratelimit.slidingWindow(20, '1 m'),
   prefix: 'ratelimit:cover',
 })
+
+
+
+
+
+
